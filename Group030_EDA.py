@@ -1,83 +1,72 @@
-"""Focused EDA and a compact, reproducible PDF report for Group030."""
+"""Rubric-aligned EDA with correct grains, join checks and uncertainty."""
 from pathlib import Path
+import math
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 GROUP_ID="Group030"; OUTPUT_DIR=Path("outputs"); FIGURE_DIR=Path("figures")
+NAMES=["orders","order_items","customers","deliveries","products","product_reviews"]
 
-def load_tables():
-    out={}
-    for n in ["orders","order_items","customers","deliveries","products","product_reviews"]:
-        out[n]=pd.read_csv(OUTPUT_DIR/f"{GROUP_ID}_{n}_standardised.csv",keep_default_na=False)
-    return out
+def load_tables(): return {n:pd.read_csv(OUTPUT_DIR/f"{GROUP_ID}_{n}_standardised.csv",keep_default_na=False) for n in NAMES}
+def wilson(k,n,z=1.96):
+    p=k/n; den=1+z*z/n; centre=(p+z*z/(2*n))/den; half=z*math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den
+    return centre-half,centre+half
 
 def make_eda():
-    t=load_tables(); FIGURE_DIR.mkdir(exist_ok=True)
-    o,items,c,d,p,r=(t[x] for x in ["orders","order_items","customers","deliveries","products","product_reviews"])
-    for f in ["order_total","order_price"]: o[f]=pd.to_numeric(o[f])
-    for f in ["rating","review_length_chars","helpful_votes"]: r[f]=pd.to_numeric(r[f])
-    d["on_time_in_full"]=d.on_time_in_full.astype(str).eq("True")
-    o["month"]=pd.to_datetime(o.order_timestamp).dt.to_period("M").astype(str)
-    figures=[]
-    def save(fig,n):
-        fig.tight_layout(); path=FIGURE_DIR/f"Figure_{n}.png"; fig.savefig(path,dpi=180,bbox_inches="tight"); figures.append(fig)
-    fig,ax=plt.subplots(figsize=(8,4)); ax.hist(o.order_total,bins=30,color="#355c7d",edgecolor="white"); ax.axvline(o.order_total.median(),color="#c06c84",ls="--",label=f"Median ${o.order_total.median():,.0f}"); ax.set(title="Figure 1. Distribution of order totals",xlabel="Order total (AUD)",ylabel="Orders");ax.legend();save(fig,1)
-    channel=o.groupby("sales_channel").agg(orders=("order_id","size"),mean_total=("order_total","mean")).sort_values("mean_total")
-    fig,ax=plt.subplots(figsize=(8,4)); channel.mean_total.plot.barh(ax=ax,color="#6c5b7b"); ax.set(title="Figure 2. Mean order total by sales channel",xlabel="Mean order total (AUD)",ylabel="Sales channel");save(fig,2)
-    oc=o.merge(c[["customer_id","loyalty_tier"]],on="customer_id",validate="many_to_one")
-    seg=oc.groupby(["loyalty_tier","sales_channel"]).order_total.mean().unstack()
-    fig,ax=plt.subplots(figsize=(8,4));seg.plot.bar(ax=ax);ax.set(title="Figure 3. Mean order total by loyalty tier and channel",xlabel="Loyalty tier",ylabel="Mean order total (AUD)");ax.legend(title="Channel");save(fig,3)
-    monthly=o.groupby("month").agg(orders=("order_id","size"),revenue=("order_total","sum"))
-    fig,ax=plt.subplots(figsize=(8,4));monthly.orders.plot(ax=ax,marker="o",color="#355c7d");ax.set(title="Figure 4. Monthly order volume",xlabel="Month",ylabel="Orders");ax.tick_params(axis="x",rotation=45);save(fig,4)
-    ratings=r.rating.value_counts().sort_index()
-    fig,axs=plt.subplots(1,2,figsize=(9,4));ratings.plot.bar(ax=axs[0],color="#f67280");axs[0].set(title="Rating composition",xlabel="Stars",ylabel="Reviews");axs[1].scatter(r.review_length_chars,r.helpful_votes,s=7,alpha=.18,color="#355c7d");axs[1].set(title="Length and helpful votes",xlabel="Clean review characters",ylabel="Helpful votes");fig.suptitle("Figure 5. Review behaviour");save(fig,5)
-    rd=r[["review_id","order_id","rating"]].merge(d[["order_id","service_level","on_time_in_full"]],on="order_id",validate="many_to_one")
-    ops=rd.groupby(["service_level","on_time_in_full"]).agg(mean_rating=("rating","mean"),reviews=("review_id","size")).reset_index()
-    pivot=ops.pivot(index="service_level",columns="on_time_in_full",values="mean_rating")
-    fig,ax=plt.subplots(figsize=(8,4));pivot.plot.bar(ax=ax,color=["#c06c84","#355c7d"]);ax.set(title="Figure 6. Review rating by service level and OTIF",xlabel="Service level",ylabel="Mean rating (1–5)",ylim=(3.5,3.9));ax.legend(title="On time in full");save(fig,6)
-    cat=items.merge(p[["product_id","category"]],on="product_id",validate="many_to_one").groupby("category").agg(revenue=("line_revenue","sum"),lines=("order_item_id","size")).sort_values("revenue")
-    fig,ax=plt.subplots(figsize=(8,4));cat.revenue.plot.barh(ax=ax,color="#4f9d8a");ax.set(title="Figure 7. Line revenue by product category",xlabel="Line revenue (AUD)",ylabel="Category");save(fig,7)
-    # Grain checks protect against inflated metrics after relational joins.
-    assert len(oc)==len(o) and len(rd)==len(r) and len(items.merge(p,on="product_id",validate="many_to_one"))==len(items)
-    metrics={"orders":len(o),"revenue":o.order_total.sum(),"median_order":o.order_total.median(),"reviews":len(r),"mean_rating":r.rating.mean(),"nonlatin":int(r.contains_non_latin_script.astype(str).eq("True").sum()),"otif":d.on_time_in_full.mean(),"delayed":int((~d.on_time_in_full).sum()),"top_category":cat.index[-1],"top_category_revenue":cat.revenue.iloc[-1],"length_helpful_corr":r.review_length_chars.corr(r.helpful_votes),"monthly_min":int(monthly.orders.min()),"monthly_max":int(monthly.orders.max())}
-    return figures,metrics
+    t=load_tables(); FIGURE_DIR.mkdir(exist_ok=True); o,it,c,d,p,r=(t[n] for n in NAMES)
+    for df,cols in [(o,["order_price","order_total","coupon_discount"]),(it,["quantity","line_revenue"]),(p,["unit_cost"]),(r,["rating"] )]:
+        for col in cols:df[col]=pd.to_numeric(df[col])
+    d["otif"]=d.on_time_in_full.astype(str).eq("True");o["date"]=pd.to_datetime(o.order_timestamp);o["month"]=o.date.dt.to_period("M").astype(str)
+    figs=[];m={}
+    def save(fig,n):fig.tight_layout();fig.savefig(FIGURE_DIR/f"Figure_{n}.png",dpi=180,bbox_inches="tight");figs.append(fig)
+    q=o.order_total.quantile([.25,.5,.75,.9]);m["quartiles"]=q.to_dict()
+    fig,ax=plt.subplots(figsize=(8.4,4.5));ax.hist(o.order_total,bins=35,color="#326273",edgecolor="white");
+    for x,label,col in [(q[.5],"Median","#e76f51"),(q[.9],"90th percentile","#6d597a")]:ax.axvline(x,ls="--",color=col,label=f"{label}: ${x:,.0f}")
+    ax.set(title="Figure 1. Order-value distribution and high-value threshold",xlabel="Net order total (AUD)",ylabel="Orders");ax.legend();save(fig,1)
+    disc=o.groupby("coupon_discount").agg(n=("order_id","size"),gross=("order_price","mean"),net=("order_total","mean"),gsd=("order_price","std"),nsd=("order_total","std")).reset_index();disc["gci"]=1.96*disc.gsd/np.sqrt(disc.n);disc["nci"]=1.96*disc.nsd/np.sqrt(disc.n);m["discount"]=disc.to_dict("records")
+    fig,ax=plt.subplots(figsize=(8.4,4.5));ax.errorbar(disc.coupon_discount,disc.gross,yerr=disc.gci,marker="o",capsize=3,label="Gross basket");ax.errorbar(disc.coupon_discount,disc.net,yerr=disc.nci,marker="o",capsize=3,label="Net total");ax.set(title="Figure 2. Discount depth, basket value and realised total",xlabel="Coupon discount (percentage points)",ylabel="Mean AUD (95% CI)");ax.legend();save(fig,2)
+    ip=it.merge(p[["product_id","category","unit_cost"]],on="product_id",validate="many_to_one");assert len(ip)==len(it);ip["margin"]=ip.line_revenue-ip.quantity*ip.unit_cost
+    cat=ip.groupby("category").agg(lines=("order_item_id","size"),revenue=("line_revenue","sum"),margin=("margin","sum")).sort_values("margin");cat["margin_rate"]=cat.margin/cat.revenue;m["category"]=cat.reset_index().to_dict("records")
+    fig,ax=plt.subplots(figsize=(8.4,4.8));cat.margin.plot.barh(ax=ax,color="#4f9d8a");ax.set(title="Figure 3. Estimated gross-margin contribution by category",xlabel="Line revenue minus catalogue cost (AUD)",ylabel="Category");save(fig,3)
+    mon=o.groupby("month").agg(orders=("order_id","size"),aov=("order_total","mean"));m["monthly"]=mon.reset_index().to_dict("records")
+    fig,axs=plt.subplots(2,1,figsize=(8.4,5.5),sharex=True);axs[0].plot(mon.index,mon.orders,marker="o");axs[0].set(title="Figure 4. Monthly demand volume and order value",ylabel="Orders");axs[1].plot(mon.index,mon.aov,marker="o",color="#e76f51");axs[1].set(xlabel="2018 month",ylabel="Mean total (AUD)");axs[1].tick_params(axis="x",rotation=45);save(fig,4)
+    cust=o.groupby("customer_id").agg(period_orders=("order_id","size")).reset_index().merge(c[["customer_id","prior_12m_orders"]],on="customer_id",validate="one_to_one");assert len(cust)==len(c);cust.prior_12m_orders=pd.to_numeric(cust.prior_12m_orders);corr=cust.prior_12m_orders.corr(cust.period_orders);m["history_corr"]=corr
+    fig,ax=plt.subplots(figsize=(8.4,4.5));ax.scatter(cust.prior_12m_orders,cust.period_orders,s=20,alpha=.45);coef=np.polyfit(cust.prior_12m_orders,cust.period_orders,1);xs=np.array([cust.prior_12m_orders.min(),cust.prior_12m_orders.max()]);ax.plot(xs,np.polyval(coef,xs),color="#e76f51",label=f"Pearson r={corr:.2f}");ax.set(title="Figure 5. Prior-year and current-period order frequency",xlabel="Prior 12-month orders per customer",ylabel="2018 orders per customer");ax.legend();save(fig,5)
+    od=d.merge(o[["order_id","nearest_warehouse"]],on="order_id",validate="one_to_one");ops=od.groupby(["carrier","service_level"]).otif.agg(["sum","count","mean"]).reset_index();ci=np.array([wilson(k,n) for k,n in zip(ops["sum"],ops["count"])]);ops["lo"],ops["hi"]=ci[:,0],ci[:,1];m["otif_cells"]=ops.to_dict("records");ops["label"]=ops.carrier+" — "+ops.service_level;ops=ops.sort_values("mean")
+    fig,ax=plt.subplots(figsize=(8.4,5));ax.errorbar(ops["mean"]*100,ops.label,xerr=[(ops["mean"]-ops.lo)*100,(ops.hi-ops["mean"])*100],fmt="o",capsize=3);ax.set(title="Figure 6. OTIF by carrier and service (95% Wilson CI)",xlabel="On-time-in-full deliveries (%)",ylabel="Carrier — service");save(fig,6)
+    rd=r[["review_id","order_id","rating"]].merge(d[["order_id","otif"]],on="order_id",validate="many_to_one");assert len(rd)==len(r);rate=rd.groupby("otif").rating.agg(["count","mean","std"]);rate["ci"]=1.96*rate["std"]/np.sqrt(rate["count"]);m["rating_otif"]=rate.reset_index().to_dict("records")
+    fig,ax=plt.subplots(figsize=(7.2,4.5));ax.bar(["Not OTIF","OTIF"],[rate.loc[False,"mean"],rate.loc[True,"mean"]],yerr=[rate.loc[False,"ci"],rate.loc[True,"ci"]],capsize=5,color=["#e76f51","#4f9d8a"]);ax.set_ylim(3.5,3.9);ax.set(title="Figure 7. Review rating by delivery outcome (95% CI)",ylabel="Mean rating (1–5)");save(fig,7)
+    m.update(orders=len(o),items=len(it),customers=len(c),deliveries=len(d),reviews=len(r),revenue=o.order_total.sum(),otif=d.otif.mean(),nonlatin=int(r.contains_non_latin_script.astype(str).eq("True").sum()))
+    return figs,m
 
-def _page(pdf,title,body,fontsize=11):
-    fig=plt.figure(figsize=(8.27,11.69));fig.text(.08,.94,title,fontsize=20,weight="bold",va="top");fig.text(.08,.89,body,fontsize=fontsize,va="top",wrap=True,linespacing=1.45);pdf.savefig(fig,bbox_inches="tight");plt.close(fig)
+def page(pdf,title,body,size=10):
+    body=body.replace("$",r"\$")
+    f=plt.figure(figsize=(8.27,11.69));f.text(.07,.95,title,fontsize=19,weight="bold",va="top");f.text(.07,.90,body,fontsize=size,va="top",wrap=True,linespacing=1.4);pdf.savefig(f);plt.close(f)
 
 def build_report(path=Path("Group030_EDA.pdf")):
-    figures,m=make_eda()
-    findings=[
-      f"1. Figure 1: Across {m['orders']:,} orders, the median order total was ${m['median_order']:,.2f}; the broad distribution makes median-based planning safer than relying only on the mean. Product mix may explain the spread, so investigate category-adjusted values.",
-      f"2. Figure 1: Total 2018 order revenue was ${m['revenue']:,.2f} across {m['orders']:,} orders. This establishes commercial scale but excludes margin and returns; pair revenue with product cost before profitability decisions.",
-      "3. Figure 2: Mean order values were similar across Web, Store and Mobile relative to within-channel dispersion. Channel is therefore a weak standalone basis for targeting; uncertainty should be quantified before reallocating spend.",
-      "4. Figure 3: Loyalty-tier/channel cells show only modest mean-value separation at the order grain. Unequal cell sizes and repeated customers can confound the pattern; use customer-level sensitivity analysis before tier policy changes.",
-      f"5. Figure 4: Monthly order volume ranged from {m['monthly_min']} to {m['monthly_max']} orders. The variation may reflect calendar length or promotions rather than seasonality; multiple years and daily rates are needed for staffing forecasts.",
-      f"6. Figure 5: Mean rating was {m['mean_rating']:.2f}/5 across {m['reviews']:,} reviews, with four- and five-star reviews most common. Verified purchase is constant, so it cannot explain rating variation in this period.",
-      f"7. Figure 5: Review length and helpful votes had correlation r={m['length_helpful_corr']:.3f} across {m['reviews']:,} reviews—effectively no linear association. Nonlinear effects and review exposure remain plausible, so length should not be optimised alone.",
-      f"8. Figure 5: {m['nonlatin']:,} of {m['reviews']:,} reviews contained non-Latin letters. Erasing them would systematically discard customer evidence; preserve multilingual text and audit language-specific performance.",
-      f"9. Figure 6: {m['delayed']:,} of {len(pd.read_csv(OUTPUT_DIR/f'{GROUP_ID}_deliveries_standardised.csv')):,} deliveries were not OTIF, yet mean ratings were close across OTIF groups. Product experience may dominate, and observational averages do not imply delivery has no causal effect.",
-      f"10. Figure 7: {m['top_category']} generated the highest line revenue (${m['top_category_revenue']:,.2f}). Revenue is not profit and category prices differ; combine unit costs and quantities before assortment decisions."
-    ]
-    ml=("MLQ-1 — Classification: At order placement, predict failure to deliver OTIF to choose proactive intervention. Unit/target: order/OTIF failure. Predictors: warehouse, service level, distance, basket size, channel and order time available then. Use forward-chaining time split; evaluate PR-AUC and recall at intervention capacity. Exclude delivered date, delay reason and post-order tracking; audit suburb/service disparities.\n\n"
-        "MLQ-2 — Regression: Predict order total at session checkout for capacity and offer planning. Unit/target: order/final total. Use customer history, channel, season and pre-checkout basket features; temporal holdout and MAE. Coupon choice or final line totals can leak the target depending on decision time; monitor error by customer segment.\n\n"
-        "MLQ-3 — Classification: Predict whether a review will be 1–2 stars to prioritise service recovery. Unit/target: completed order/review rating class. Use order, product, delivery-service and customer history available before review. Temporal split; PR-AUC and calibrated precision. Never use review text, helpful votes or post-review fields; non-reviewers create selection bias.\n\n"
-        "MLQ-4 — Forecasting: Forecast weekly order counts by channel for staffing. Unit/target: channel-week/order count. Use lagged counts, calendar, season and known planned promotions; rolling-origin validation and WAPE. One year limits seasonal learning, and unknown future promotions/weather create deployment drift.\n\n"
-        "MLQ-5 — Clustering: Identify product demand/value profiles for assortment review. Unit/objective: product, clustered on pre-period or rolling line volume, revenue, price, cost and review summaries. Validate stability across time windows and silhouette plus business interpretability. Scaling choices dominate clusters; popularity exposure and sparse products can bias conclusions.")
-    with PdfPages(path) as pdf:
-        _page(pdf,"FIT5196 A1 — Group030","Focused exploratory analysis of reconciled 2018 commerce and operations data\n\nPrepared from six standardised relational tables\n\nAssessed report: 7 figures, 10 findings, 5 future ML questions")
-        _page(pdf,"1. Context and preparation assurance","The workflow integrates JSON commerce and XML operations exports into six analysis-ready tables at their published grains. Material decisions: structured parsing precedes regex; identifiers retain case and leading zeros; duplicate records are compared after normalisation and reconciled by business key; monetary arithmetic follows rounded line revenue, included GST, discount then delivery; multilingual cleaned reviews are preserved separately from Latin-only analysis (MAP-*).\n\nValidation evidence: all six schemas and field orders pass (VAL-SCHEMA-*); primary and foreign keys are complete and unique (VAL-PK-* / VAL-FK-*); no normalised cross-source conflicts remain (VAL-FLOW-01); arithmetic differences are within $0.01 (VAL-ARITH-*); temporal checks pass at the published date/timestamp precision (VAL-TIME-*); and literal NaN plus multilingual indicators pass (VAL-TEXT-*). Join assertions in the EDA preserve the left-table grain.")
-        for start in [0,2,4,6]:
-            figs=figures[start:start+2]; page=plt.figure(figsize=(8.27,11.69)); gs=page.add_gridspec(2,1)
-            for idx,src in enumerate(figs):
-                src.canvas.draw(); import numpy as np
-                img=np.asarray(src.canvas.buffer_rgba()); ax=page.add_subplot(gs[idx]);ax.imshow(img);ax.axis("off")
-            pdf.savefig(page,bbox_inches="tight");plt.close(page)
-        _page(pdf,"3. Ten evidence-based findings","\n\n".join(findings),fontsize=8.7)
-        _page(pdf,"4. Five future machine-learning questions",ml,fontsize=8.8)
-        _page(pdf,"5. Limitations and conclusion","Limitations. The data cover one historical year and one retailer, so seasonality and external validity are limited. Associations are observational, repeated customers/products are not independent, and review analyses condition on customers who submitted reviews. Revenue is not profit; delivery-date fields are day-level; small language groups make subgroup estimates uncertain. No causal or model-performance claim is made.\n\nConclusion. The reconciled relational data show broad order-value variation, stable channel-level averages, commercially concentrated product-category revenue, high but imperfect OTIF performance and little raw relationship between review helpfulness and length. Operational prediction and forecasting are feasible next steps only with temporal evaluation, decision-time feature controls and subgroup monitoring.")
-    for f in figures: plt.close(f)
-    return m
+    figs,m=make_eda();q=m["quartiles"];disc=m["discount"];cat=max(m["category"],key=lambda x:x["margin"]);mon=m["monthly"];op=min(m["otif_cells"],key=lambda x:x["mean"]);rr={x["otif"]:x for x in m["rating_otif"]};diff=rr[True]["mean"]-rr[False]["mean"]
+    findings=[f"1. Figure 1 — Across {m['orders']:,} orders, median net total was ${q[.5]:,.2f}; the top 10% began at ${q[.9]:,.2f}. The long upper tail makes the mean unrepresentative of a typical order. Category mix may explain high values, so use this threshold for investigation, not automatic treatment.",f"2. Figure 2 — Gross basket means stayed within ${min(x['gross'] for x in disc):,.0f}–${max(x['gross'] for x in disc):,.0f}, while net total fell from ${disc[0]['net']:,.0f} at 0% to ${disc[-1]['net']:,.0f} at 25% (n={disc[-1]['n']}). Coupon assignment is not random; test causal lift before increasing depth.",f"3. Figure 3 — {cat['category']} contributed the most estimated gross margin (${cat['margin']:,.0f}) across {cat['lines']:,} lines. Catalogue cost excludes overhead, returns and discounts, so this ranks contribution rather than accounting profit; add realised costs before assortment changes.",f"4. Figure 4 — Monthly volume ranged from {min(x['orders'] for x in mon)} to {max(x['orders'] for x in mon)} orders and monthly AOV from ${min(x['aov'] for x in mon):,.0f} to ${max(x['aov'] for x in mon):,.0f}. One year cannot separate seasonality from promotions or month length; obtain several years and campaign calendars.",f"5. Figure 5 — For {m['customers']} customers, prior and current order counts had Pearson r={m['history_corr']:.2f}, a weak positive association. History alone has limited ranking power; tenure and campaign exposure may explain changes. Validate a multivariable model temporally.",f"6. Figure 6 — Overall OTIF was {m['otif']:.1%} across {m['deliveries']:,} deliveries, leaving material improvement scope. Aggregate performance hides carrier/service mix; target investigation at stratum level.",f"7. Figure 6 — The lowest observed cell was {op['carrier']} {op['service_level']} at {op['mean']:.1%} OTIF (n={op['count']}). Its interval overlaps peers, so rank is not proof of underperformance; control for route mix and collect repeated periods.",f"8. Figure 7 — Mean rating differed by only {abs(diff):.02f} points between OTIF and non-OTIF deliveries across {m['reviews']:,} reviews. This near-null average does not prove delivery is unimportant: selection and product quality may mask effects. Examine low-rating risk and delay severity.",f"9. Figure 3 — All {m['items']:,} item rows survived the validated many-to-one product join, preventing revenue inflation. Line discounts are unavailable, so category margins remain pre-discount; allocate discounts before profitability use.",f"10. Text assurance — {m['nonlatin']:,} of {m['reviews']:,} reviews contained non-Latin letters. Removing them would discard customer evidence. Preserve multilingual text and evaluate future text models by language, acknowledging small-group uncertainty."]
+    ml="""MLQ-1 — OTIF-risk classification. Decision/unit/target: proactive intervention per order / OTIF failure. Predictors available at dispatch: warehouse, carrier, service, distance, expedited flag, basket and timing. Rolling temporal split; PR-AUC, calibration and recall at capacity. Exclude delivered date, delay reason and tracking outcomes; audit geographic/service false negatives.
 
-if __name__=="__main__": print(build_report())
+MLQ-2 — Weekly demand forecasting. Decision/unit/target: staffing per channel-week / order count. Use lagged counts, calendar and known campaigns; rolling-origin validation, WAPE and interval coverage. One year limits seasonality; promotions must be known at forecast time.
+
+MLQ-3 — Low-rating classification. Decision/unit/target: service recovery per completed order / 1–2 star review. Use product, customer history and delivery facts available before outreach; temporal split, PR-AUC and calibration. Text, helpful votes and rating-derived fields leak; reviewer selection and language fairness matter.
+
+MLQ-4 — Customer-frequency regression. Decision/unit/target: retention capacity per customer / next-90-day count. Use past history, tier, acquisition and past mix; cohort temporal split, MAE and Poisson deviance. Exclude future orders/updated lifetime value; audit protected proxies.
+
+MLQ-5 — Product clustering. Decision/unit/objective: assortment roles per product / stable demand-value profiles using lagged volume, revenue, margin, rating and price. Test time-window stability, silhouette and merchant interpretability. Scaling and sparse exposure may dominate."""
+    with PdfPages(path) as pdf:
+        page(pdf,"FIT5196 A1 — Group030","Focused EDA from six reconciled relational tables\n\n7 assessed figures · exactly 10 findings · exactly 5 ML questions",13)
+        page(pdf,"1. Context and preparation assurance","JSON and XML were parsed structurally before bounded regex. Dates, timestamps, booleans, currency and percentage points were normalised before primary-key reconciliation. Order arithmetic follows rounded lines, included GST, discount, then delivery; multilingual and Latin-only text are separate (MAP-*).\n\nExecutable checks cover ordered schemas and required values (VAL-SCHEMA/MISS-*), PK/FK integrity, raw-to-canonical overlap (VAL-FLOW-*), $0.01 arithmetic, ranges, temporal order, literal NaN, reference formats and Unicode measures. EDA joins specify cardinality and assert unchanged left-table row counts.",10.5)
+        page(pdf,"2. Assessed-figure analytical contracts","Figure 1 — Question: what is typical versus high-value? Unit/denominator: each of 5,000 orders. Table: orders. Limitation: value is not profit.\n\nFigure 2 — Question: do deeper coupons correspond to larger gross baskets? Unit: order within discount group. Table: orders. Means use 95% CIs. Limitation: observational coupon assignment.\n\nFigure 3 — Question: which categories contribute estimated gross margin? Unit: 15,723 item lines. Join: items.product_id → products.product_id (many-to-one; row count retained). Limitation: catalogue cost and no line discount allocation.\n\nFigure 4 — Question: are monthly changes volume- or value-driven? Unit: month from all orders. Table: orders. Limitation: one year and unequal month lengths.\n\nFigure 5 — Question: does historical frequency carry forward? Unit: 500 customers. Join: customer-level orders → customers.customer_id (one-to-one). Limitation: linear unadjusted association.\n\nFigure 6 — Question: which carrier/service cells warrant review? Unit: delivery within cell. Join: deliveries.order_id → orders.order_id (one-to-one). Wilson 95% CIs. Limitation: uncontrolled route mix.\n\nFigure 7 — Question: is OTIF associated with rating? Unit: 7,000 reviews. Join: reviews.order_id → deliveries.order_id (many-to-one; review rows retained). Limitation: reviewer selection and product confounding.",9.5)
+        for start in [0,2,4,6]:
+            f=plt.figure(figsize=(8.27,11.69));gs=f.add_gridspec(2,1)
+            for j,src in enumerate(figs[start:start+2]):src.canvas.draw();ax=f.add_subplot(gs[j]);ax.imshow(np.asarray(src.canvas.buffer_rgba()));ax.axis("off")
+            pdf.savefig(f);plt.close(f)
+        page(pdf,"3. Ten evidence-based findings","\n\n".join(findings),8.5);page(pdf,"4. Five future ML questions",ml,8.7)
+        page(pdf,"5. Limitations and conclusion","The export is observational, covers one retailer-year, and contains repeated customers/products. Coupon and delivery assignments are not random; reviews condition on reviewers; catalogue cost is not realised cost; delivery dates are day-level; subgroup sizes differ. Associations are not causal.\n\nThe clearest decision signals are category economic concentration and heterogeneous OTIF. Discount depth does not visibly expand gross baskets, but causal lift needs an experiment. Historical frequency is weak alone and average ratings barely differ by OTIF. Future work requires temporal validation, leakage control and subgroup monitoring.",11)
+    for f in figs:plt.close(f)
+    return m
+if __name__=="__main__":print(build_report())

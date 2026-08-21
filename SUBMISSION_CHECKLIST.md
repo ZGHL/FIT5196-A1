@@ -4,7 +4,7 @@
 - [x] Six output CSVs match the dictionary field names/order.
 - [x] Solution and EDA notebooks pass a fresh offline run.
 - [x] Text public cases pass 18/18; additional near-match/Unicode cases pass.
-- [x] Validation register reports 33/33 PASS.
+- [x] Validation register reports 45/45 PASS.
 - [x] Mapping has all 111 required rows and no blank core evidence fields.
 - [x] EDA PDF has 7 assessed figures, exactly 10 findings and exactly 5 ML questions in 9 pages.
 - [x] Raw JSON/XML files are excluded from Git and must be excluded from the Moodle ZIP.

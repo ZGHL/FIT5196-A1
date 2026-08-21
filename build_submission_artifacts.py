@@ -44,4 +44,7 @@ def make_notebooks():
     (ROOT/'Group030_solution.ipynb').write_text(json.dumps(notebook(sol),ensure_ascii=False,indent=1),encoding='utf-8')
     (ROOT/'Group030_EDA.ipynb').write_text(json.dumps(notebook(eda),ensure_ascii=False,indent=1),encoding='utf-8')
 
-if __name__=='__main__': make_mapping();make_notebooks()
+if __name__=='__main__':
+    make_mapping()
+    # The detailed builder supersedes the original compact notebook scaffold.
+    import build_detailed_notebooks  # noqa: F401
