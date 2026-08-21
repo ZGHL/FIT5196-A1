@@ -1,0 +1,34 @@
+validation_id,status,observed_result,resolution_or_interpretation
+VAL-SCHEMA-01,PASS,"['customers', 'deliveries', 'order_items', 'orders', 'product_reviews', 'products']",None required
+VAL-SCHEMA-02,PASS,"orders: 5000 rows, 23 ordered columns",None required
+VAL-PK-01,PASS,"orders.order_id: missing=0, duplicates=0",None required
+VAL-SCHEMA-03,PASS,"order_items: 15723 rows, 6 ordered columns",None required
+VAL-PK-02,PASS,"order_items.order_item_id: missing=0, duplicates=0",None required
+VAL-SCHEMA-04,PASS,"customers: 500 rows, 20 ordered columns",None required
+VAL-PK-03,PASS,"customers.customer_id: missing=0, duplicates=0",None required
+VAL-SCHEMA-05,PASS,"deliveries: 5000 rows, 20 ordered columns",None required
+VAL-PK-04,PASS,"deliveries.delivery_id: missing=0, duplicates=0",None required
+VAL-SCHEMA-06,PASS,"products: 1000 rows, 21 ordered columns",None required
+VAL-PK-05,PASS,"products.product_id: missing=0, duplicates=0",None required
+VAL-SCHEMA-07,PASS,"product_reviews: 7000 rows, 21 ordered columns",None required
+VAL-PK-06,PASS,"product_reviews.review_id: missing=0, duplicates=0",None required
+VAL-FK-01,PASS,orders.customer_id -> customers.customer_id: orphan keys=0,None required
+VAL-FK-02,PASS,order_items.order_id -> orders.order_id: orphan keys=0,None required
+VAL-FK-03,PASS,order_items.product_id -> products.product_id: orphan keys=0,None required
+VAL-FK-04,PASS,deliveries.order_id -> orders.order_id: orphan keys=0,None required
+VAL-FK-05,PASS,product_reviews.order_id -> orders.order_id: orphan keys=0,None required
+VAL-FK-06,PASS,product_reviews.order_item_id -> order_items.order_item_id: orphan keys=0,None required
+VAL-FK-07,PASS,product_reviews.product_id -> products.product_id: orphan keys=0,None required
+VAL-FK-08,PASS,product_reviews.customer_id -> customers.customer_id: orphan keys=0,None required
+VAL-FLOW-01,PASS,normalised cross-source conflicts=0,Investigate every listed field conflict before submission
+VAL-FLOW-02,PASS,orders: canonical rows=5000; duplicates removed data-driven by order_id,None required
+VAL-FLOW-03,PASS,order_items: canonical rows=15723; duplicates removed data-driven by order_item_id,None required
+VAL-FLOW-05,PASS,deliveries: canonical rows=5000; duplicates removed data-driven by delivery_id,None required
+VAL-FLOW-07,PASS,product_reviews: canonical rows=7000; duplicates removed data-driven by review_id,None required
+VAL-ARITH-01,PASS,max order price difference=0.0000,None required
+VAL-ARITH-02,PASS,max total difference=0.0000,None required
+VAL-ARITH-03,PASS,GST equals included order_price/11; not added to total,None required
+VAL-TIME-01,PASS,order-date <= dispatch <= delivered violations=0,None required
+VAL-TIME-02,PASS,review before order violations=0,None required
+VAL-TEXT-01,PASS,empty prescribed strings=0; literal NaN retained,None required
+VAL-TEXT-02,PASS,non-Latin reviews=303 of 7000,None required

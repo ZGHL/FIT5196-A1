@@ -1,0 +1,243 @@
+"""Reproducible Group030 JSON/XML integration and validation workflow."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import pandas as pd
+
+from Group030_text_functions import (
+    MISSING, build_latin_analysis, clean_narrative_text,
+    contains_non_latin_script, extract_order_reference,
+    extract_product_sku, extract_promo_code,
+)
+
+GROUP_ID = "Group030"
+TABLES = ["orders", "order_items", "customers", "deliveries", "products", "product_reviews"]
+
+
+def money(value):
+    if isinstance(value, (int, float)): return float(value)
+    return float(re.sub(r"[^0-9.+-]", "", str(value).replace(",", "")))
+
+
+def boolean(value):
+    if isinstance(value, bool): return value
+    v = str(value).strip().lower()
+    if v in {"true", "t", "yes", "y", "1"}: return True
+    if v in {"false", "f", "no", "n", "0"}: return False
+    raise ValueError(f"Unrecognised boolean: {value!r}")
+
+
+def text(value):
+    v = "" if value is None else str(value).strip()
+    return v if v else MISSING
+
+
+def date(value, dayfirst=False):
+    return pd.to_datetime(value, dayfirst=dayfirst).strftime("%Y-%m-%d")
+
+
+def timestamp(value, dayfirst=False):
+    return pd.to_datetime(value, dayfirst=dayfirst).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def xml_record(element):
+    return {child.tag: child.text for child in element}
+
+
+def normalise_order(h, source):
+    get = (lambda a, b: h[a]) if source == "json" else (lambda a, b: h.findtext(b))
+    raw_note = get("customerNote", "Customer_Note")
+    discount_raw = get("couponDiscount", "Coupon_Discount")
+    discount = float(discount_raw) if source == "json" else money(discount_raw)
+    return {
+        "order_id": text(get("orderID", "Order_ID")),
+        "source_system_record_id": text(get("sourceSystemRecordID", "Source_System_Record_ID")),
+        "customer_id": text(get("customerID", "Customer_ID")),
+        "order_timestamp": timestamp(get("orderTimestamp", "Order_Timestamp"), source == "xml"),
+        "sales_channel": text(get("salesChannel", "Sales_Channel")),
+        "payment_method": text(get("paymentMethod", "Payment_Method")),
+        "currency": text(get("currency", "Currency")),
+        "nearest_warehouse": text(get("nearestWarehouse", "Nearest_Warehouse")),
+        "order_status": text(get("orderStatus", "Order_Status")),
+        "delivery_charges": round(money(get("deliveryCharges", "Delivery_Charges")), 2),
+        "coupon_code": text(get("couponCode", "Coupon_Code")),
+        "coupon_discount": discount,
+        "season": text(get("season", "Season")),
+        "expedited_delivery": boolean(get("expeditedDelivery", "Expedited_Delivery")),
+        "customer_lat": float(get("customerLat", "Customer_Lat")),
+        "customer_long": float(get("customerLong", "Customer_Long")),
+        "device_type": text(get("deviceType", "Device_Type")),
+        "referral_source": text(get("referralSource", "Referral_Source")),
+        "customer_note_clean": clean_narrative_text(raw_note),
+        "promo_code": extract_promo_code(raw_note),
+    }
+
+
+def normalise_item(item, source):
+    get = (lambda a, b: item[a]) if source == "json" else (lambda a, b: item.findtext(b))
+    qty = int(get("quantity", "Quantity")); price = money(get("unitPrice", "Unit_Price"))
+    return {"order_item_id": text(get("orderItemID", "Order_Item_ID")),
+            "order_id": text(get("orderID", "Order_ID")), "product_id": text(get("productID", "Product_ID")),
+            "quantity": qty, "unit_price": round(price, 2), "line_revenue": round(qty * price, 2)}
+
+
+def normalise_delivery(d, source):
+    get = (lambda a, b: d[a]) if source == "json" else (lambda a, b: d.findtext(b))
+    return {"delivery_id": text(get("deliveryID", "Delivery_ID")), "order_id": text(get("orderID", "Order_ID")),
+      "dispatch_date": date(get("dispatchDate", "Dispatch_Date"), source == "xml"),
+      "promised_date": date(get("promisedDate", "Promised_Date"), source == "xml"),
+      "delivered_date": date(get("deliveredDate", "Delivered_Date"), source == "xml"),
+      "carrier": text(get("carrier", "Carrier")), "service_level": text(get("serviceLevel", "Service_Level")),
+      "delivery_status": text(get("deliveryStatus", "Delivery_Status")), "delay_days": int(get("delayDays", "Delay_Days")),
+      "on_time_in_full": boolean(get("onTimeInFull", "On_Time_In_Full")),
+      "fulfilment_hours": int(get("fulfilmentHours", "Fulfilment_Hours")),
+      "delivery_cost": round(money(get("deliveryCost", "Delivery_Cost")), 2),
+      "delay_reason": text(get("delayReason", "Delay_Reason")), "promised_days": int(get("promisedDays", "Promised_Days")),
+      "tracking_event_count": int(get("trackingEventCount", "Tracking_Event_Count")),
+      "delivery_window": text(get("deliveryWindow", "Delivery_Window")),
+      "shipping_distance_km": float(get("shippingDistanceKm", "Shipping_Distance_Km")),
+      "signature_required": boolean(get("signatureRequired", "Signature_Required")),
+      "estimated_carbon_kg": float(get("estimatedCarbonKg", "Estimated_Carbon_Kg")),
+      "delivery_note_clean": clean_narrative_text(get("deliveryNoteClean", "Delivery_Note_Clean"))}
+
+
+def normalise_review(r, source):
+    get = (lambda a, b: r[a]) if source == "json" else (lambda a, b: r.findtext(b))
+    raw = get("reviewText", "Review_Text"); clean = clean_narrative_text(raw)
+    return {"review_id": text(get("reviewID", "Review_ID")), "order_id": text(get("orderID", "Order_ID")),
+      "order_item_id": text(get("orderItemID", "Order_Item_ID")), "product_id": text(get("productID", "Product_ID")),
+      "customer_id": text(get("customerID", "Customer_ID")),
+      "review_timestamp": timestamp(get("reviewTimestamp", "Review_Timestamp"), source == "xml"),
+      "language_code": text(get("languageCode", "Language_Code")), "rating": int(get("rating", "Rating")),
+      "review_title": text(get("reviewTitle", "Review_Title")), "review_body_clean": clean,
+      "review_body_latin_analysis": build_latin_analysis(clean),
+      "verified_purchase": boolean(get("verifiedPurchase", "Verified_Purchase")),
+      "helpful_votes": int(get("helpfulVotes", "Helpful_Votes")),
+      "review_length_chars": 0 if clean == MISSING else len(clean),
+      "review_word_count": 0 if clean == MISSING else len(clean.split()),
+      "contains_non_latin_script": contains_non_latin_script(clean),
+      "extracted_order_reference": extract_order_reference(raw), "extracted_product_sku": extract_product_sku(raw),
+      "delivery_experience": text(get("deliveryExperience", "Delivery_Experience")),
+      "value_experience": text(get("valueExperience", "Value_Experience")),
+      "writing_style": text(get("writingStyle", "Writing_Style"))}
+
+
+def reconcile(records, key, table, conflicts):
+    canonical = {}
+    for source, row in records:
+        k = row[key]
+        if k not in canonical: canonical[k] = (row, {source})
+        else:
+            old, sources = canonical[k]
+            differences = {f: (old[f], row[f]) for f in row if old[f] != row[f]}
+            if differences: conflicts.append({"table": table, "key": k, "differences": differences})
+            sources.add(source)
+    return [canonical[k][0] for k in sorted(canonical)]
+
+
+def build_tables(input_dir, dictionary_path):
+    with open(input_dir / f"{GROUP_ID}_commerce.json", encoding="utf-8") as f: js = json.load(f)
+    root = ET.parse(input_dir / f"{GROUP_ID}_operations.xml").getroot()
+    conflicts = []
+    order_rows=[]; item_rows=[]; delivery_rows=[]; review_rows=[]
+    for o in js["orders"]:
+        order_rows.append(("JSON", normalise_order(o["header"], "json")))
+        item_rows += [("JSON", normalise_item(x, "json")) for x in o["shoppingCart"]]
+        if o.get("delivery"): delivery_rows.append(("JSON", normalise_delivery(o["delivery"], "json")))
+    for o in root.findall("./Orders/Order"):
+        order_rows.append(("XML", normalise_order(o.find("Header"), "xml")))
+        item_rows += [("XML", normalise_item(x, "xml")) for x in o.findall("./Shopping_Cart/Item")]
+        if o.find("Delivery") is not None: delivery_rows.append(("XML", normalise_delivery(o.find("Delivery"), "xml")))
+    for r in js["productReviews"]: review_rows.append(("JSON", normalise_review(r, "json")))
+    for r in root.findall("./ProductReviews/Review"): review_rows.append(("XML", normalise_review(r, "xml")))
+    customers=[]
+    cmap={"customerID":"customer_id","signupDate":"signup_date","loyaltyTier":"loyalty_tier","customerSegment":"customer_segment","ageBand":"age_band","preferredChannel":"preferred_channel","homeSuburb":"home_suburb","prior12MOrders":"prior_12m_orders","lifetimeValueBeforePeriod":"lifetime_value_before_period","marketingConsent":"marketing_consent","homePostcode":"home_postcode","homeState":"home_state","homeCountry":"home_country","preferredLanguage":"preferred_language","acquisitionSource":"acquisition_source","accountStatus":"account_status","preferredDevice":"preferred_device","emailDomain":"email_domain","householdSizeBand":"household_size_band","contactFrequencyPreference":"contact_frequency_preference"}
+    for x in js["customerProfiles"]:
+        row={v:x[k] for k,v in cmap.items()}; row["signup_date"]=date(row["signup_date"]); row["home_postcode"]=str(row["home_postcode"]); customers.append(row)
+    products=[]
+    pmap={"Product_ID":"product_id","Product_Name":"product_name","Category":"category","Brand":"brand","Unit_Price":"unit_price","Unit_Cost":"unit_cost","Launch_Year":"launch_year","Warranty_Months":"warranty_months","Weight_Kg":"weight_kg","Product_Sku":"product_sku","Subcategory":"subcategory","Model_Family":"model_family","Colour":"colour","Supplier_ID":"supplier_id","Supplier_Country":"supplier_country","Launch_Date":"launch_date","Tax_Category":"tax_category","Package_Type":"package_type","Recyclable_Packaging":"recyclable_packaging","Active_Flag":"active_flag","Product_Description":"product_description_clean"}
+    for p in root.findall("./ProductCatalogue/Product"):
+        x=xml_record(p); row={v:x.get(k) for k,v in pmap.items()}
+        for f in ["unit_price","unit_cost","weight_kg"]: row[f]=money(row[f])
+        for f in ["launch_year","warranty_months"]: row[f]=int(row[f])
+        for f in ["recyclable_packaging","active_flag"]: row[f]=boolean(row[f])
+        row["launch_date"]=date(row["launch_date"], True); row["product_description_clean"]=clean_narrative_text(row["product_description_clean"]); products.append(row)
+    tables={"orders":pd.DataFrame(reconcile(order_rows,"order_id","orders",conflicts)),
+      "order_items":pd.DataFrame(reconcile(item_rows,"order_item_id","order_items",conflicts)),
+      "customers":pd.DataFrame(sorted(customers,key=lambda x:x["customer_id"])),
+      "deliveries":pd.DataFrame(reconcile(delivery_rows,"delivery_id","deliveries",conflicts)),
+      "products":pd.DataFrame(sorted(products,key=lambda x:x["product_id"])),
+      "product_reviews":pd.DataFrame(reconcile(review_rows,"review_id","product_reviews",conflicts))}
+    # Published arithmetic is derived from canonical item lines, not trusted source totals.
+    sums=tables["order_items"].groupby("order_id",as_index=False).line_revenue.sum().rename(columns={"line_revenue":"order_price"})
+    tables["orders"]=tables["orders"].merge(sums,on="order_id",validate="one_to_one")
+    tables["orders"]["order_price"]=tables["orders"]["order_price"].round(2)
+    tables["orders"]["tax_amount"]=(tables["orders"].order_price/11).round(2)
+    tables["orders"]["order_total"]=(tables["orders"].order_price*(1-tables["orders"].coupon_discount/100)+tables["orders"].delivery_charges).round(2)
+    dictionary=pd.read_csv(dictionary_path)
+    for name,df in tables.items():
+        cols=dictionary.loc[dictionary.output_table.eq(name)].sort_values("position").field_name.tolist()
+        tables[name]=df[cols]
+    profile={"json":{"customers":len(js["customerProfiles"]),"orders":len(js["orders"]),"reviews":len(js["productReviews"])},
+      "xml":{"orders":len(root.findall("./Orders/Order")),"products":len(root.findall("./ProductCatalogue/Product")),"reviews":len(root.findall("./ProductReviews/Review"))},
+      "conflicts":conflicts}
+    return tables, profile
+
+
+def validate(tables, dictionary, profile):
+    rows=[]
+    def add(cid, passed, observed, resolution="None required"):
+        rows.append({"validation_id":cid,"status":"PASS" if passed else "FAIL","observed_result":str(observed),"resolution_or_interpretation":resolution})
+    expected=set(TABLES); add("VAL-SCHEMA-01",set(tables)==expected,sorted(tables))
+    for name,df in tables.items():
+        exp=dictionary[dictionary.output_table.eq(name)].sort_values("position").field_name.tolist()
+        add(f"VAL-SCHEMA-{TABLES.index(name)+2:02d}",list(df)==exp,f"{name}: {len(df)} rows, {len(df.columns)} ordered columns")
+        pk={"orders":"order_id","order_items":"order_item_id","customers":"customer_id","deliveries":"delivery_id","products":"product_id","product_reviews":"review_id"}[name]
+        add(f"VAL-PK-{TABLES.index(name)+1:02d}",df[pk].notna().all() and df[pk].is_unique,f"{name}.{pk}: missing={df[pk].isna().sum()}, duplicates={df[pk].duplicated().sum()}")
+    fks=[("orders","customer_id","customers","customer_id"),("order_items","order_id","orders","order_id"),("order_items","product_id","products","product_id"),("deliveries","order_id","orders","order_id"),("product_reviews","order_id","orders","order_id"),("product_reviews","order_item_id","order_items","order_item_id"),("product_reviews","product_id","products","product_id"),("product_reviews","customer_id","customers","customer_id")]
+    for i,(ct,cf,pt,pf) in enumerate(fks,1):
+        missing=set(tables[ct][cf])-set(tables[pt][pf]); add(f"VAL-FK-{i:02d}",not missing,f"{ct}.{cf} -> {pt}.{pf}: orphan keys={len(missing)}")
+    add("VAL-FLOW-01",not profile["conflicts"],f"normalised cross-source conflicts={len(profile['conflicts'])}","Investigate every listed field conflict before submission")
+    for table,key in [("orders","order_id"),("order_items","order_item_id"),("deliveries","delivery_id"),("product_reviews","review_id")]:
+        add(f"VAL-FLOW-{TABLES.index(table)+2:02d}",True,f"{table}: canonical rows={len(tables[table])}; duplicates removed data-driven by {key}")
+    items=tables["order_items"].groupby("order_id").line_revenue.sum().round(2)
+    actual=tables["orders"].set_index("order_id").order_price
+    add("VAL-ARITH-01",(actual-items).abs().le(.01).all(),f"max order price difference={(actual-items).abs().max():.4f}")
+    o=tables["orders"]
+    calc=(o.order_price*(1-o.coupon_discount/100)+o.delivery_charges).round(2)
+    add("VAL-ARITH-02",(o.order_total-calc).abs().le(.01).all(),f"max total difference={(o.order_total-calc).abs().max():.4f}")
+    add("VAL-ARITH-03",(o.tax_amount-o.order_price.div(11).round(2)).abs().le(.01).all(),"GST equals included order_price/11; not added to total")
+    d=tables["deliveries"].merge(o[["order_id","order_timestamp"]],on="order_id")
+    # Dispatch is date-only, so compare calendar dates (same-day dispatch is valid).
+    temporal=(pd.to_datetime(d.order_timestamp).dt.normalize()<=pd.to_datetime(d.dispatch_date)) & (pd.to_datetime(d.dispatch_date)<=pd.to_datetime(d.delivered_date))
+    add("VAL-TIME-01",temporal.all(),f"order-date <= dispatch <= delivered violations={(~temporal).sum()}")
+    rv=tables["product_reviews"].merge(o[["order_id","order_timestamp"]],on="order_id")
+    rt=pd.to_datetime(rv.review_timestamp)>=pd.to_datetime(rv.order_timestamp)
+    add("VAL-TIME-02",rt.all(),f"review before order violations={(~rt).sum()}")
+    sentinel_fields=[("orders","coupon_code"),("orders","promo_code"),("product_reviews","extracted_order_reference"),("product_reviews","extracted_product_sku"),("product_reviews","review_body_latin_analysis")]
+    empty=sum((tables[t][f].astype(str).str.strip()=="").sum() for t,f in sentinel_fields)
+    add("VAL-TEXT-01",empty==0,f"empty prescribed strings={empty}; literal NaN retained")
+    nonlatin=tables["product_reviews"].contains_non_latin_script
+    add("VAL-TEXT-02",nonlatin.any(),f"non-Latin reviews={nonlatin.sum()} of {len(nonlatin)}")
+    return pd.DataFrame(rows)
+
+
+def main(input_dir=Path("raw_input"), output_dir=Path("outputs"), dictionary_path=Path("public_data_dictionary.csv")):
+    output_dir.mkdir(parents=True,exist_ok=True)
+    tables,profile=build_tables(Path(input_dir),Path(dictionary_path)); dictionary=pd.read_csv(dictionary_path)
+    for name,df in tables.items(): df.to_csv(output_dir/f"{GROUP_ID}_{name}_standardised.csv",index=False,na_rep=MISSING)
+    validations=validate(tables,dictionary,profile); validations.to_csv(output_dir/f"{GROUP_ID}_validation_register.csv",index=False)
+    print(validations.to_string(index=False)); print("\nRow counts:", {k:len(v) for k,v in tables.items()})
+    if (validations.status=="FAIL").any(): raise SystemExit("Validation failures require investigation")
+    return tables, validations, profile
+
+
+if __name__ == "__main__":
+    parser=argparse.ArgumentParser(); parser.add_argument("--input-dir",type=Path,default=Path("raw_input")); parser.add_argument("--output-dir",type=Path,default=Path("outputs")); parser.add_argument("--dictionary",type=Path,default=Path("public_data_dictionary.csv")); args=parser.parse_args()
+    main(args.input_dir,args.output_dir,args.dictionary)

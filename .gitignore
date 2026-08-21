@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+raw_input/
+Group030_A1.zip
+templates-*.zip
+FIT5196-s2-2026-A1-Specificaton.pdf
+FIT5196-s2-2026-A1-Marking-Rubrics.pdf
+A1_manifest.json
+public_data_dictionary.csv
+README.source.md
