@@ -13,6 +13,10 @@ def make_mapping():
         bits=s.split('_'); return bits[0]+''.join(acronyms.get(x,x.title()) for x in bits[1:])
     def snake_xml(s): return '_'.join(('ID' if x=='id' else 'Sku' if x=='sku' else x.title()) for x in s.split('_'))
     derived={'order_price':'sum(round(quantity * unit_price, 2)) by order_id; round to 2 decimals','line_revenue':'round(quantity * unit_price, 2)','tax_amount':'round(order_price / 11, 2), included GST','order_total':'round(order_price * (1 - coupon_discount/100) + delivery_charges, 2)','promo_code':'bounded extraction from raw customer note; uppercase or literal NaN','review_body_clean':'contract-order HTML/entity/marker/URL/emoji/reference cleaning; NFC and lowercase','review_body_latin_analysis':'derive from review_body_clean, retaining Latin letters/diacritics, digits and punctuation','review_length_chars':'0 for sentinel NaN else Python len(review_body_clean)','review_word_count':'0 for sentinel NaN else whitespace token count','contains_non_latin_script':'true iff cleaned review contains a letter outside Latin script','extracted_order_reference':'bounded extraction from raw review; uppercase or literal NaN','extracted_product_sku':'bounded extraction from raw review; uppercase or literal NaN'}
+    narrative={'customer_note_clean':'extract promo first; then entity decode, NFC, bounded tag/marker/URL/emoji/promo removal, whitespace collapse and lowercase; literal NaN if empty','product_description_clean':'entity decode, NFC, bounded tag/marker/URL/emoji removal, whitespace collapse and lowercase; literal NaN if empty','delivery_note_clean':'entity decode, NFC, bounded narrative cleaning and lowercase; literal NaN if empty'}
+    dates={'signup_date','dispatch_date','promised_date','delivered_date','launch_date'}; datetimes={'order_timestamp','review_timestamp'}
+    booleans={'expedited_delivery','marketing_consent','on_time_in_full','signature_required','recyclable_packaging','active_flag','verified_purchase'}
+    money_fields={'unit_price','unit_cost','order_price','delivery_charges','tax_amount','order_total','line_revenue','delivery_cost','lifetime_value_before_period'}
     derived_paths={
       'line_revenue':('$.orders[].shoppingCart[].quantity | $.orders[].shoppingCart[].unitPrice','/OperationsExport/Orders/Order/Shopping_Cart/Item/Quantity | /OperationsExport/Orders/Order/Shopping_Cart/Item/Unit_Price'),
       'order_price':('$.orders[].shoppingCart[].quantity | $.orders[].shoppingCart[].unitPrice','/OperationsExport/Orders/Order/Shopping_Cart/Item/Quantity | /OperationsExport/Orders/Order/Shopping_Cart/Item/Unit_Price'),
@@ -27,10 +31,19 @@ def make_mapping():
         t,f=r['output_table'],r['target_field']; sf=source_only.get(t,'both')
         if f in {'order_price','tax_amount','order_total','line_revenue','review_body_latin_analysis','review_length_chars','review_word_count','contains_non_latin_script'}: sf='derived'
         r['source_format']=sf
-        if t in json_roots and sf in {'JSON','both'}: r['json_source_path']=json_roots[t]+'.'+camel({'review_body_clean':'review_text','extracted_order_reference':'review_text','extracted_product_sku':'review_text','promo_code':'customer_note'}.get(f,f))
-        if t in xml_roots and sf in {'XML','both'}: r['xml_source_path']=xml_roots[t]+'/'+snake_xml({'review_body_clean':'review_text','extracted_order_reference':'review_text','extracted_product_sku':'review_text','promo_code':'customer_note'}.get(f,f))
+        aliases={'review_body_clean':'review_text','extracted_order_reference':'review_text','extracted_product_sku':'review_text','promo_code':'customer_note','customer_note_clean':'customer_note','product_description_clean':'product_description'}
+        if t in json_roots and sf in {'JSON','both'}: r['json_source_path']=json_roots[t]+'.'+camel(aliases.get(f,f))
+        if t in xml_roots and sf in {'XML','both'}: r['xml_source_path']=xml_roots[t]+'/'+snake_xml(aliases.get(f,f))
         if f in derived_paths: r['json_source_path'],r['xml_source_path']=derived_paths[f]
-        r['transformation_or_derivation']=derived.get(f, 'direct copy after trim and target type conversion; date/time/boolean/currency normalised where applicable')
+        if f in derived:r['transformation_or_derivation']=derived[f]
+        elif f in narrative:r['transformation_or_derivation']=narrative[f]
+        elif f in dates:r['transformation_or_derivation']='parse source-specific date (ISO or day-first) and format YYYY-MM-DD'
+        elif f in datetimes:r['transformation_or_derivation']='parse source-specific timestamp and format YYYY-MM-DD HH:MM:SS'
+        elif f in booleans:r['transformation_or_derivation']='map JSON boolean or XML Y/N to Python/CSV True or False'
+        elif f=='coupon_discount':r['transformation_or_derivation']='convert numeric or percent-labelled value to numeric percentage points'
+        elif f in money_fields:r['transformation_or_derivation']='remove AUD label/thousands separators, convert numeric and round monetary value to 2 decimals where published'
+        elif f.endswith('_id') or f in {'product_sku','home_postcode'}:r['transformation_or_derivation']='trim and preserve identifier/category case and leading zeros; no invented identity'
+        else:r['transformation_or_derivation']='trim source value and convert to the target string or numeric type without changing structured category case'
         r['overlap_or_conflict_rule']='Compare normalised non-missing values by table primary key; retain one canonical row only when equal; register any conflict (no silent source precedence).'
         r['notebook_evidence']=f"Section 4 — {t}; Section 5 reconciliation; VAL-SCHEMA/PK/FLOW"
     with open(ROOT/'Group030_source_to_target_mapping.csv','w',newline='',encoding='utf-8') as f: w=csv.DictWriter(f,fieldnames=rows[0]);w.writeheader();w.writerows(rows)

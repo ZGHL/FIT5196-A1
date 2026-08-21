@@ -11,7 +11,9 @@ python3 Group030_solution.py
 python3 Group030_EDA.py
 ```
 
-The first command recreates all submitted CSVs and the validation register. The second recreates Figures 1–7 and the nine-page EDA PDF. Both workflows run offline.
+The first command recreates all submitted CSVs and the validation register. The second recreates Figures 1–7 and the ten-page EDA PDF. Both workflows run offline.
+
+The submitted notebooks are self-contained: they do not import `Group030_solution.py` or `Group030_EDA.py`. Those scripts are exports of the canonical implementation cells and can be regenerated with `python3 export_notebook_scripts.py`.
 
 ## Important submission note
 

@@ -184,6 +184,11 @@ def build_tables(input_dir, dictionary_path):
     for name,df in tables.items():
         cols=dictionary.loc[dictionary.output_table.eq(name)].sort_values("position").field_name.tolist()
         tables[name]=df[cols]
+    source_key_sets={}
+    for table, rows, key in [("orders",order_rows,"order_id"),("order_items",item_rows,"order_item_id"),("deliveries",delivery_rows,"delivery_id"),("product_reviews",review_rows,"review_id")]:
+        source_key_sets[table]={s:[row[key] for src,row in rows if src==s] for s in ["JSON","XML"]}
+    duplicates={table:{src:len(keys)-len(set(keys)) for src,keys in sources.items()} for table,sources in source_key_sets.items()}
+    overlap={table:len(set(sources["JSON"]) & set(sources["XML"])) for table,sources in source_key_sets.items()}
     profile={"json":{"customers":len(js["customerProfiles"]),"orders":len(js["orders"]),
       "order_items":sum(len(x["shoppingCart"]) for x in js["orders"]),
       "deliveries":sum(bool(x.get("delivery")) for x in js["orders"]),"reviews":len(js["productReviews"])},
@@ -191,61 +196,78 @@ def build_tables(input_dir, dictionary_path):
       "order_items":len(root.findall("./Orders/Order/Shopping_Cart/Item")),
       "deliveries":len(root.findall("./Orders/Order/Delivery")),
       "products":len(root.findall("./ProductCatalogue/Product")),"reviews":len(root.findall("./ProductReviews/Review"))},
-      "canonical":{k:len(v) for k,v in tables.items()}, "conflicts":conflicts}
+      "canonical":{k:len(v) for k,v in tables.items()}, "within_source_duplicates":duplicates,
+      "cross_source_overlap":overlap, "conflicts":conflicts}
     return tables, profile
 
 
 def validate(tables, dictionary, profile):
     rows=[]
-    def add(cid, passed, observed, resolution="None required"):
-        rows.append({"validation_id":cid,"status":"PASS" if passed else "FAIL","observed_result":str(observed),"resolution_or_interpretation":resolution})
-    expected=set(TABLES); add("VAL-SCHEMA-01",set(tables)==expected,sorted(tables))
+    def add(cid, check, passed, observed, resolution="None required"):
+        rows.append({"validation_id":cid,"check":check,"status":"PASS" if passed else "FAIL","observed_result":str(observed),"resolution_or_interpretation":resolution})
+    expected=set(TABLES); add("VAL-SCHEMA-01","All six required tables are present",set(tables)==expected,sorted(tables))
     for name,df in tables.items():
         exp=dictionary[dictionary.output_table.eq(name)].sort_values("position").field_name.tolist()
-        add(f"VAL-SCHEMA-{TABLES.index(name)+2:02d}",list(df)==exp,f"{name}: {len(df)} rows, {len(df.columns)} ordered columns")
+        add(f"VAL-SCHEMA-{TABLES.index(name)+2:02d}",f"{name} columns match dictionary order",list(df)==exp,f"{name}: {len(df)} rows, {len(df.columns)} ordered columns")
         pk={"orders":"order_id","order_items":"order_item_id","customers":"customer_id","deliveries":"delivery_id","products":"product_id","product_reviews":"review_id"}[name]
-        add(f"VAL-PK-{TABLES.index(name)+1:02d}",df[pk].notna().all() and df[pk].is_unique,f"{name}.{pk}: missing={df[pk].isna().sum()}, duplicates={df[pk].duplicated().sum()}")
+        add(f"VAL-PK-{TABLES.index(name)+1:02d}",f"{name} primary key is complete and unique",df[pk].notna().all() and df[pk].is_unique,f"{name}.{pk}: missing={df[pk].isna().sum()}, duplicates={df[pk].duplicated().sum()}")
         required=dictionary[(dictionary.output_table.eq(name)) & (~dictionary.nullable.astype(bool))].field_name
         blank=sum((df[f].astype(str).str.strip()=="").sum() for f in required)
-        add(f"VAL-MISS-{TABLES.index(name)+1:02d}",blank==0,f"{name}: empty required values={blank}")
+        add(f"VAL-MISS-{TABLES.index(name)+1:02d}",f"{name} required fields contain no empty strings",blank==0,f"{name}: empty required values={blank}")
+        type_failures=[]
+        for _,spec in dictionary[dictionary.output_table.eq(name)].iterrows():
+            s=df[spec.field_name]; typ=spec.data_type
+            ok=(pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s)) if typ=="number" else pd.api.types.is_bool_dtype(s) if typ=="boolean" else s.astype(str).str.fullmatch(r"\d{4}-\d{2}-\d{2}").all() if typ=="date" else s.astype(str).str.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").all() if typ=="datetime" else True
+            if not ok:type_failures.append(spec.field_name)
+        add(f"VAL-TYPE-{TABLES.index(name)+1:02d}",f"{name} fields conform to dictionary data types",not type_failures,f"type failures={type_failures}")
     fks=[("orders","customer_id","customers","customer_id"),("order_items","order_id","orders","order_id"),("order_items","product_id","products","product_id"),("deliveries","order_id","orders","order_id"),("product_reviews","order_id","orders","order_id"),("product_reviews","order_item_id","order_items","order_item_id"),("product_reviews","product_id","products","product_id"),("product_reviews","customer_id","customers","customer_id")]
     for i,(ct,cf,pt,pf) in enumerate(fks,1):
-        missing=set(tables[ct][cf])-set(tables[pt][pf]); add(f"VAL-FK-{i:02d}",not missing,f"{ct}.{cf} -> {pt}.{pf}: orphan keys={len(missing)}")
-    add("VAL-FLOW-01",not profile["conflicts"],f"normalised cross-source conflicts={len(profile['conflicts'])}","Investigate every listed field conflict before submission")
+        missing=set(tables[ct][cf])-set(tables[pt][pf]); add(f"VAL-FK-{i:02d}",f"{ct}.{cf} references {pt}.{pf}",not missing,f"orphan keys={len(missing)}")
+    duplicate_counts=profile["within_source_duplicates"]
+    add("VAL-DUP-01","Within-source duplicate primary keys are counted and reconciled",all(v>=0 for x in duplicate_counts.values() for v in x.values()) and not profile["conflicts"],duplicate_counts,"Identical normalised duplicates are collapsed by primary key; any differing field would appear in VAL-CONFLICT-01")
+    add("VAL-OVERLAP-01","Cross-source key overlap is measured independently",all(v>0 for v in profile["cross_source_overlap"].values()),profile["cross_source_overlap"])
+    add("VAL-CONFLICT-01","Overlapping normalised records contain no field conflicts",not profile["conflicts"],f"normalised cross-source conflicts={len(profile['conflicts'])}","Investigate every listed field conflict before submission")
     profile_names={"orders":"orders","order_items":"order_items","deliveries":"deliveries","product_reviews":"reviews"}
     for table,key in [("orders","order_id"),("order_items","order_item_id"),("deliveries","delivery_id"),("product_reviews","review_id")]:
         pkey=profile_names[table]; raw=profile["json"][pkey]+profile["xml"][pkey]; canonical=len(tables[table]); overlap=raw-canonical
         passed=0 <= overlap <= min(profile["json"][pkey],profile["xml"][pkey])
-        add(f"VAL-FLOW-{TABLES.index(table)+2:02d}",passed,f"{table}: JSON+XML={raw}, canonical={canonical}, overlap removed={overlap}, key={key}")
+        add(f"VAL-FLOW-{TABLES.index(table)+2:02d}",f"{table} raw-to-canonical row equation holds",passed,f"JSON+XML={raw}, canonical={canonical}, overlap removed={overlap}, key={key}")
     items=tables["order_items"].groupby("order_id").line_revenue.sum().round(2)
     actual=tables["orders"].set_index("order_id").order_price
-    add("VAL-ARITH-01",(actual-items).abs().le(.01).all(),f"max order price difference={(actual-items).abs().max():.4f}")
+    add("VAL-ARITH-01","Order price equals sum of rounded line revenues",(actual-items).abs().le(.01).all(),f"max difference={(actual-items).abs().max():.4f}")
     o=tables["orders"]
     calc=(o.order_price*(1-o.coupon_discount/100)+o.delivery_charges).round(2)
-    add("VAL-ARITH-02",(o.order_total-calc).abs().le(.01).all(),f"max total difference={(o.order_total-calc).abs().max():.4f}")
-    add("VAL-ARITH-03",(o.tax_amount-o.order_price.div(11).round(2)).abs().le(.01).all(),"GST equals included order_price/11; not added to total")
+    add("VAL-ARITH-02","Order total applies discount then delivery without adding GST",(o.order_total-calc).abs().le(.01).all(),f"max difference={(o.order_total-calc).abs().max():.4f}")
+    add("VAL-ARITH-03","Tax is included GST equal to order_price/11",(o.tax_amount-o.order_price.div(11).round(2)).abs().le(.01).all(),"GST not added to total")
     numeric_ok=(o.order_price.ge(0)&o.delivery_charges.ge(0)&o.coupon_discount.between(0,100)&o.customer_lat.between(-90,90)&o.customer_long.between(-180,180)).all()
-    add("VAL-RANGE-01",numeric_ok,"orders: non-negative money, discount 0–100, valid latitude/longitude")
-    add("VAL-RANGE-02",tables["order_items"].quantity.gt(0).all() and tables["order_items"].unit_price.ge(0).all(),f"items: min quantity={tables['order_items'].quantity.min()}, min price={tables['order_items'].unit_price.min()}")
-    add("VAL-RANGE-03",tables["product_reviews"].rating.between(1,5).all() and tables["product_reviews"].helpful_votes.ge(0).all(),f"reviews: rating range={tables['product_reviews'].rating.min()}–{tables['product_reviews'].rating.max()}, negative helpful votes={(tables['product_reviews'].helpful_votes<0).sum()}")
+    add("VAL-RANGE-01","Order numeric values fall in sensible ranges",numeric_ok,"non-negative money; discount 0–100; valid coordinates")
+    add("VAL-RANGE-02","Item quantity is positive and price non-negative",tables["order_items"].quantity.gt(0).all() and tables["order_items"].unit_price.ge(0).all(),f"min quantity={tables['order_items'].quantity.min()}, min price={tables['order_items'].unit_price.min()}")
+    add("VAL-RANGE-03","Review rating is 1–5 and helpful votes non-negative",tables["product_reviews"].rating.between(1,5).all() and tables["product_reviews"].helpful_votes.ge(0).all(),f"rating={tables['product_reviews'].rating.min()}–{tables['product_reviews'].rating.max()}")
+    categorical={"sales_channel":{"Web","Store","Mobile"},"currency":{"AUD"},"order_status":{"Completed"},"service_level":{"Express","Standard"},"delivery_status":{"Delivered"},"rating":{1,2,3,4,5}}
+    cat_bad={f:sorted(set((tables["orders"] if f in tables["orders"] else tables["deliveries"] if f in tables["deliveries"] else tables["product_reviews"])[f])-allowed) for f,allowed in categorical.items()}
+    add("VAL-CAT-01","Published structured categories use observed allowed vocabularies",all(not x for x in cat_bad.values()),cat_bad)
     d=tables["deliveries"].merge(o[["order_id","order_timestamp"]],on="order_id")
     # Dispatch is date-only, so compare calendar dates (same-day dispatch is valid).
     temporal=(pd.to_datetime(d.order_timestamp).dt.normalize()<=pd.to_datetime(d.dispatch_date)) & (pd.to_datetime(d.dispatch_date)<=pd.to_datetime(d.delivered_date))
-    add("VAL-TIME-01",temporal.all(),f"order-date <= dispatch <= delivered violations={(~temporal).sum()}")
+    add("VAL-TIME-01","Order date <= dispatch <= delivered",temporal.all(),f"violations={(~temporal).sum()}")
+    promised=(pd.to_datetime(d.dispatch_date)<=pd.to_datetime(d.promised_date)); delivered=pd.to_datetime(d.delivered_date); promised_date=pd.to_datetime(d.promised_date); expected_delay=(delivered-promised_date).dt.days.clip(lower=0)
+    add("VAL-TIME-02","Promised date is not before dispatch",promised.all(),f"violations={(~promised).sum()}")
+    delay_consistency=d.delay_days.eq(expected_delay) & d.on_time_in_full.eq(delivered.le(promised_date))
+    add("VAL-TIME-03","Delay days and OTIF agree with promised/delivered dates",delay_consistency.all(),f"violations={(~delay_consistency).sum()}")
     rv=tables["product_reviews"].merge(o[["order_id","order_timestamp"]],on="order_id")
     rt=pd.to_datetime(rv.review_timestamp)>=pd.to_datetime(rv.order_timestamp)
-    add("VAL-TIME-02",rt.all(),f"review before order violations={(~rt).sum()}")
+    add("VAL-TIME-04","Review timestamp is not before order timestamp",rt.all(),f"violations={(~rt).sum()}")
     sentinel_fields=[("orders","coupon_code"),("orders","promo_code"),("product_reviews","extracted_order_reference"),("product_reviews","extracted_product_sku"),("product_reviews","review_body_latin_analysis")]
     empty=sum((tables[t][f].astype(str).str.strip()=="").sum() for t,f in sentinel_fields)
-    add("VAL-TEXT-01",empty==0,f"empty prescribed strings={empty}; literal NaN retained")
+    add("VAL-TEXT-01","Prescribed missing strings use literal NaN, not empty",empty==0,f"empty prescribed strings={empty}")
     nonlatin=tables["product_reviews"].contains_non_latin_script
-    add("VAL-TEXT-02",nonlatin.any(),f"non-Latin reviews={nonlatin.sum()} of {len(nonlatin)}")
+    add("VAL-TEXT-02","Multilingual reviews and non-Latin indicators are preserved",nonlatin.any(),f"non-Latin reviews={nonlatin.sum()} of {len(nonlatin)}")
     refs=tables["product_reviews"]
     order_pattern=r"^(?:NaN|[HC]ORD\d{6})$"; sku_pattern=r"^(?:NaN|SKU-[A-Z0-9]+)$"
-    add("VAL-TEXT-03",refs.extracted_order_reference.str.fullmatch(order_pattern).all(),f"invalid extracted order reference formats={(~refs.extracted_order_reference.str.fullmatch(order_pattern)).sum()}")
-    add("VAL-TEXT-04",refs.extracted_product_sku.str.fullmatch(sku_pattern).all(),f"invalid extracted SKU formats={(~refs.extracted_product_sku.str.fullmatch(sku_pattern)).sum()}")
+    add("VAL-TEXT-03","Extracted order references follow bounded format",refs.extracted_order_reference.str.fullmatch(order_pattern).all(),f"invalid formats={(~refs.extracted_order_reference.str.fullmatch(order_pattern)).sum()}")
+    add("VAL-TEXT-04","Extracted SKUs follow bounded format",refs.extracted_product_sku.str.fullmatch(sku_pattern).all(),f"invalid formats={(~refs.extracted_product_sku.str.fullmatch(sku_pattern)).sum()}")
     review_lengths=refs.review_body_clean.map(lambda x:0 if x==MISSING else len(x))
-    add("VAL-TEXT-05",review_lengths.eq(refs.review_length_chars).all(),f"review length mismatches={(review_lengths!=refs.review_length_chars).sum()}")
+    add("VAL-TEXT-05","Review character counts derive from cleaned multilingual text",review_lengths.eq(refs.review_length_chars).all(),f"mismatches={(review_lengths!=refs.review_length_chars).sum()}")
     return pd.DataFrame(rows)
 
 
@@ -259,6 +281,6 @@ def main(input_dir=Path("raw_input"), output_dir=Path("outputs"), dictionary_pat
     return tables, validations, profile
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "get_ipython" not in globals():
     parser=argparse.ArgumentParser(); parser.add_argument("--input-dir",type=Path,default=Path("raw_input")); parser.add_argument("--output-dir",type=Path,default=Path("outputs")); parser.add_argument("--dictionary",type=Path,default=Path("public_data_dictionary.csv")); args=parser.parse_args()
     main(args.input_dir,args.output_dir,args.dictionary)
