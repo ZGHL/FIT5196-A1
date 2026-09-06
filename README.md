@@ -2,19 +2,35 @@
 
 Reproducible integration of the allocated JSON and XML exports into six standardised relational tables, followed by validation and focused EDA.
 
+## Repository layout
+
+Teacher-supplied files are under `assignment_materials/`. Working notebooks, code, generated tables, mapping and figures are under `processing/`. The project root is reserved for the README, submission checklist and the two final Moodle upload files.
+
 ## Reproduce
 
-Place the allocated `Group030_commerce.json` and `Group030_operations.xml` in `raw_input/`, and keep `public_data_dictionary.csv` in the project root. Then run:
+From the project root, run:
 
 ```bash
-python3 Group030_solution.py
-python3 Group030_EDA.py
+python3 processing/code/Group030_solution.py
+python3 processing/code/Group030_EDA.py
 ```
 
 The first command recreates all submitted CSVs and the validation register. The second recreates Figures 1–7 and the ten-page EDA PDF. Both workflows run offline.
 
-The submitted notebooks are self-contained: they do not import `Group030_solution.py` or `Group030_EDA.py`. Those scripts are exports of the canonical implementation cells and can be regenerated with `python3 export_notebook_scripts.py`.
+The working notebooks are in `processing/notebooks/`. They are self-contained and do not import the main workflow from the corresponding Python exports.
+
+After changing either notebook, regenerate the Python exports with:
+
+```bash
+python3 processing/code/build/export_notebook_scripts.py
+```
+
+When the signed declaration and AI records are complete, create the Moodle archive with:
+
+```bash
+python3 processing/code/build/build_final_submission.py
+```
 
 ## Important submission note
 
-The allocated raw data are intentionally excluded from Git and from the submission archive, as required by the specification. Before Moodle submission, all group members must complete and sign `Group030_AI_declaration.pdf`, and the group must add the complete assignment conversation export plus an English index under `AI_records/`.
+The final Moodle files are `Group030_A1_submission.zip` and `Group030_EDA.pdf` in the project root. The allocated raw data are never copied into the submission archive. Before final packaging, all group members must sign `Group030_AI_declaration.pdf`; complete genuine conversation exports and the English index remain under `AI_records/`.

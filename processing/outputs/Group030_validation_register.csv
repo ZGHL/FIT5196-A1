@@ -2,27 +2,27 @@ validation_id,check,status,observed_result,resolution_or_interpretation
 VAL-SCHEMA-01,All six required tables are present,PASS,"['customers', 'deliveries', 'order_items', 'orders', 'product_reviews', 'products']",None required
 VAL-SCHEMA-02,orders columns match dictionary order,PASS,"orders: 5000 rows, 23 ordered columns",None required
 VAL-PK-01,orders primary key is complete and unique,PASS,"orders.order_id: missing=0, duplicates=0",None required
-VAL-MISS-01,orders required fields contain no empty strings,PASS,orders: empty required values=0,None required
+VAL-MISS-01,orders required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-01,orders fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-SCHEMA-03,order_items columns match dictionary order,PASS,"order_items: 15723 rows, 6 ordered columns",None required
 VAL-PK-02,order_items primary key is complete and unique,PASS,"order_items.order_item_id: missing=0, duplicates=0",None required
-VAL-MISS-02,order_items required fields contain no empty strings,PASS,order_items: empty required values=0,None required
+VAL-MISS-02,order_items required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-02,order_items fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-SCHEMA-04,customers columns match dictionary order,PASS,"customers: 500 rows, 20 ordered columns",None required
 VAL-PK-03,customers primary key is complete and unique,PASS,"customers.customer_id: missing=0, duplicates=0",None required
-VAL-MISS-03,customers required fields contain no empty strings,PASS,customers: empty required values=0,None required
+VAL-MISS-03,customers required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-03,customers fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-SCHEMA-05,deliveries columns match dictionary order,PASS,"deliveries: 5000 rows, 20 ordered columns",None required
 VAL-PK-04,deliveries primary key is complete and unique,PASS,"deliveries.delivery_id: missing=0, duplicates=0",None required
-VAL-MISS-04,deliveries required fields contain no empty strings,PASS,deliveries: empty required values=0,None required
+VAL-MISS-04,deliveries required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-04,deliveries fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-SCHEMA-06,products columns match dictionary order,PASS,"products: 1000 rows, 21 ordered columns",None required
 VAL-PK-05,products primary key is complete and unique,PASS,"products.product_id: missing=0, duplicates=0",None required
-VAL-MISS-05,products required fields contain no empty strings,PASS,products: empty required values=0,None required
+VAL-MISS-05,products required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-05,products fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-SCHEMA-07,product_reviews columns match dictionary order,PASS,"product_reviews: 7000 rows, 21 ordered columns",None required
 VAL-PK-06,product_reviews primary key is complete and unique,PASS,"product_reviews.review_id: missing=0, duplicates=0",None required
-VAL-MISS-06,product_reviews required fields contain no empty strings,PASS,product_reviews: empty required values=0,None required
+VAL-MISS-06,product_reviews required and prescribed string values use the correct missing representation,PASS,"empty=0, pandas missing=0, invalid literal NaN=0",None required
 VAL-TYPE-06,product_reviews fields conform to dictionary data types,PASS,type failures=[],None required
 VAL-FK-01,orders.customer_id references customers.customer_id,PASS,orphan keys=0,None required
 VAL-FK-02,order_items.order_id references orders.order_id,PASS,orphan keys=0,None required
@@ -32,13 +32,16 @@ VAL-FK-05,product_reviews.order_id references orders.order_id,PASS,orphan keys=0
 VAL-FK-06,product_reviews.order_item_id references order_items.order_item_id,PASS,orphan keys=0,None required
 VAL-FK-07,product_reviews.product_id references products.product_id,PASS,orphan keys=0,None required
 VAL-FK-08,product_reviews.customer_id references customers.customer_id,PASS,orphan keys=0,None required
-VAL-DUP-01,Within-source duplicate primary keys are counted and reconciled,PASS,"{'orders': {'JSON': 68, 'XML': 68}, 'order_items': {'JSON': 211, 'XML': 217}, 'deliveries': {'JSON': 68, 'XML': 68}, 'product_reviews': {'JSON': 96, 'XML': 96}}",Identical normalised duplicates are collapsed by primary key; any differing field would appear in VAL-CONFLICT-01
-VAL-OVERLAP-01,Cross-source key overlap is measured independently,PASS,"{'orders': 500, 'order_items': 1557, 'deliveries': 500, 'product_reviews': 700}",None required
+VAL-DUP-01,Within-source duplicate primary keys are counted for all six tables,PASS,"{'orders': {'JSON': 68, 'XML': 68}, 'order_items': {'JSON': 211, 'XML': 217}, 'customers': {'JSON': 0, 'XML': 0}, 'deliveries': {'JSON': 68, 'XML': 68}, 'products': {'JSON': 0, 'XML': 0}, 'product_reviews': {'JSON': 96, 'XML': 96}}",Duplicate rows are compared field by field and collapsed by primary key
+VAL-OVERLAP-01,Cross-source overlap is measured separately from within-source duplication,PASS,"{'orders': 500, 'order_items': 1557, 'customers': 0, 'deliveries': 500, 'products': 0, 'product_reviews': 700}",None required
 VAL-CONFLICT-01,Overlapping normalised records contain no field conflicts,PASS,normalised cross-source conflicts=0,Investigate every listed field conflict before submission
-VAL-FLOW-02,orders raw-to-canonical row equation holds,PASS,"JSON+XML=5636, canonical=5000, overlap removed=636, key=order_id",None required
-VAL-FLOW-03,order_items raw-to-canonical row equation holds,PASS,"JSON+XML=17708, canonical=15723, overlap removed=1985, key=order_item_id",None required
-VAL-FLOW-05,deliveries raw-to-canonical row equation holds,PASS,"JSON+XML=5636, canonical=5000, overlap removed=636, key=delivery_id",None required
-VAL-FLOW-07,product_reviews raw-to-canonical row equation holds,PASS,"JSON+XML=7892, canonical=7000, overlap removed=892, key=review_id",None required
+VAL-FLOW-01,orders canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 2818, 'JSON unique': 2750, 'XML rows': 2818, 'XML unique': 2750, 'cross-source overlap': 500, 'expected canonical': 5000, 'actual canonical': 5000}",None required
+VAL-FLOW-02,order_items canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 8823, 'JSON unique': 8612, 'XML rows': 8885, 'XML unique': 8668, 'cross-source overlap': 1557, 'expected canonical': 15723, 'actual canonical': 15723}",None required
+VAL-FLOW-03,customers canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 500, 'JSON unique': 500, 'XML rows': 0, 'XML unique': 0, 'cross-source overlap': 0, 'expected canonical': 500, 'actual canonical': 500}",None required
+VAL-FLOW-04,deliveries canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 2818, 'JSON unique': 2750, 'XML rows': 2818, 'XML unique': 2750, 'cross-source overlap': 500, 'expected canonical': 5000, 'actual canonical': 5000}",None required
+VAL-FLOW-05,products canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 0, 'JSON unique': 0, 'XML rows': 1000, 'XML unique': 1000, 'cross-source overlap': 0, 'expected canonical': 1000, 'actual canonical': 1000}",None required
+VAL-FLOW-06,product_reviews canonical keys equal the union of unique JSON/XML keys,PASS,"{'JSON rows': 3946, 'JSON unique': 3850, 'XML rows': 3946, 'XML unique': 3850, 'cross-source overlap': 700, 'expected canonical': 7000, 'actual canonical': 7000}",None required
+VAL-ARITH-00,Line revenue equals rounded quantity multiplied by unit price,PASS,max difference=0.0000,None required
 VAL-ARITH-01,Order price equals sum of rounded line revenues,PASS,max difference=0.0000,None required
 VAL-ARITH-02,Order total applies discount then delivery without adding GST,PASS,max difference=0.0000,None required
 VAL-ARITH-03,Tax is included GST equal to order_price/11,PASS,GST not added to total,None required
@@ -49,9 +52,14 @@ VAL-CAT-01,Published structured categories use observed allowed vocabularies,PAS
 VAL-TIME-01,Order date <= dispatch <= delivered,PASS,violations=0,None required
 VAL-TIME-02,Promised date is not before dispatch,PASS,violations=0,None required
 VAL-TIME-03,Delay days and OTIF agree with promised/delivered dates,PASS,violations=0,None required
+VAL-TIME-03B,Promised days agree with dispatch and promised dates,PASS,violations=0,None required
 VAL-TIME-04,Review timestamp is not before order timestamp,PASS,violations=0,None required
 VAL-TEXT-01,"Prescribed missing strings use literal NaN, not empty",PASS,empty prescribed strings=0,None required
 VAL-TEXT-02,Multilingual reviews and non-Latin indicators are preserved,PASS,non-Latin reviews=303 of 7000,None required
 VAL-TEXT-03,Extracted order references follow bounded format,PASS,invalid formats=0,None required
 VAL-TEXT-04,Extracted SKUs follow bounded format,PASS,invalid formats=0,None required
+VAL-TEXT-04B,Extracted promotion codes follow bounded format,PASS,invalid formats=0,None required
 VAL-TEXT-05,Review character counts derive from cleaned multilingual text,PASS,mismatches=0,None required
+VAL-TEXT-06,Review word counts derive from cleaned multilingual text,PASS,mismatches=0,None required
+VAL-TEXT-07,Latin analysis is derived from cleaned multilingual review text,PASS,mismatches=0,None required
+VAL-TEXT-08,Non-Latin indicator is derived from cleaned multilingual review text,PASS,mismatches=0,None required

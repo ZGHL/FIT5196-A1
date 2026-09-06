@@ -1,4 +1,4 @@
-"""Rubric-aligned EDA with correct grains, join checks and uncertainty."""
+"""EDA workflow exported from Group030_EDA.ipynb."""
 from pathlib import Path
 import math
 import numpy as np
@@ -6,10 +6,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-GROUP_ID="Group030"; OUTPUT_DIR=Path("outputs"); FIGURE_DIR=Path("figures")
-NAMES=["orders","order_items","customers","deliveries","products","product_reviews"]
+PROJECT_ROOT = Path.cwd()
+GROUP_ID = "Group030"
+if (PROJECT_ROOT / "processing" / "outputs").is_dir():
+    OUTPUT_DIR = PROJECT_ROOT / "processing" / "outputs"
+    FIGURE_DIR = PROJECT_ROOT / "processing" / "figures"
+else:
+    OUTPUT_DIR = PROJECT_ROOT / "outputs"
+    FIGURE_DIR = PROJECT_ROOT / "figures"
+NAMES = ["orders", "order_items", "customers", "deliveries", "products", "product_reviews"]
+
 
 def load_tables(): return {n:pd.read_csv(OUTPUT_DIR/f"{GROUP_ID}_{n}_standardised.csv",keep_default_na=False) for n in NAMES}
+
 def wilson(k,n,z=1.96):
     p=k/n; den=1+z*z/n; centre=(p+z*z/(2*n))/den; half=z*math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den
     return centre-half,centre+half
@@ -70,4 +79,6 @@ MLQ-5 — Product clustering. Decision/unit/objective: assortment roles per prod
         page(pdf,"5. Limitations and conclusion","The export is observational, covers one retailer-year, and contains repeated customers/products. Coupon and delivery assignments are not random; reviews condition on reviewers; catalogue cost is not realised cost; delivery dates are day-level; subgroup sizes differ. Associations are not causal.\n\nThe clearest decision signals are category economic concentration and heterogeneous OTIF. Discount depth does not visibly expand gross baskets, but causal lift needs an experiment. Historical frequency is weak alone and average ratings barely differ by OTIF. Future work requires temporal validation, leakage control and subgroup monitoring.",11)
     for f in figs:plt.close(f)
     return m
-if __name__=="__main__":print(build_report())
+
+if __name__ == "__main__":
+    print(build_report())

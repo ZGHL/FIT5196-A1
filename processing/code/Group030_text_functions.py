@@ -8,7 +8,7 @@ import unicodedata
 
 MISSING = "NaN"
 
-_ORDER_RE = re.compile(r"(?<![A-Za-z0-9])(?:HORD|CORD)\d{6}(?![A-Za-z0-9])", re.I)
+_ORDER_RE = re.compile(r"(?<![A-Za-z0-9_-])(?:HORD|CORD)\d{6}(?![A-Za-z0-9_-])", re.I)
 _SKU_RE = re.compile(r"(?<![A-Za-z0-9_-])SKU-[A-Za-z0-9]+(?![A-Za-z0-9_-])", re.I)
 _PROMO_RE = re.compile(r"(?<![A-Za-z0-9_-])B[1-5]SAVE-\d{2}(?![A-Za-z0-9_-])", re.I)
 _TAG_RE = re.compile(r"<[^<>]*>")

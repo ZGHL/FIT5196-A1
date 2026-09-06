@@ -4,7 +4,8 @@ import textwrap
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-OUT = Path("AI_records/Group030_AI_index.pdf")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+OUT = PROJECT_ROOT / "AI_records/Group030_AI_index.pdf"
 
 sections = [
     ("Record identification", "Record ID: AI-01\nMember: Xinhang Ren (Student ID 35134410)\nTool/model: ChatGPT (OpenAI), GPT-5.6 Sol\nComplete export: AI-01.pdf\nLanguage: Chinese original conversation"),
