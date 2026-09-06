@@ -25,6 +25,11 @@ def notebook_functions(path):
     return functions
 
 
+def notebook_code(path):
+    notebook = nbformat.read(path, as_version=4)
+    return "\n\n".join(cell.source for cell in notebook.cells if cell.cell_type == "code")
+
+
 solution_order = [
     "money", "boolean", "text", "date", "timestamp", "xml_record",
     "normalise_order", "normalise_item", "normalise_delivery", "normalise_review",
@@ -96,37 +101,10 @@ if __name__ == "__main__" and "get_ipython" not in globals():
     encoding="utf-8",
 )
 
-eda_order = ["load_tables", "wilson", "make_eda", "page", "build_report"]
-eda_functions = notebook_functions(NOTEBOOK_DIR / "Group030_EDA.ipynb")
-missing = set(eda_order) - set(eda_functions)
-if missing:
-    raise RuntimeError(f"EDA notebook is missing functions: {sorted(missing)}")
-
-eda_header = '''"""EDA workflow exported from Group030_EDA.ipynb."""
-from pathlib import Path
-import math
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-
-PROJECT_ROOT = Path.cwd()
-GROUP_ID = "Group030"
-if (PROJECT_ROOT / "processing" / "outputs").is_dir():
-    OUTPUT_DIR = PROJECT_ROOT / "processing" / "outputs"
-    FIGURE_DIR = PROJECT_ROOT / "processing" / "figures"
-else:
-    OUTPUT_DIR = PROJECT_ROOT / "outputs"
-    FIGURE_DIR = PROJECT_ROOT / "figures"
-NAMES = ["orders", "order_items", "customers", "deliveries", "products", "product_reviews"]
-'''
-eda_cli = '''
-
-if __name__ == "__main__":
-    print(build_report())
-'''
 (CODE_DIR / "Group030_EDA.py").write_text(
-    eda_header + "\n\n" + "\n\n".join(eda_functions[name] for name in eda_order) + eda_cli,
+    '"""EDA code exported cell-by-cell from Group030_EDA.ipynb."""\n\n'
+    + notebook_code(NOTEBOOK_DIR / "Group030_EDA.ipynb")
+    + "\n",
     encoding="utf-8",
 )
 print("Exported Group030_solution.py and Group030_EDA.py from the final notebooks")
