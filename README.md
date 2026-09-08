@@ -17,7 +17,7 @@ FIT5196-A1/
 │   ├── code/                   # Notebook 导出的 Python 文件、文本函数和构建脚本
 │   ├── mapping/                # Source-to-target mapping
 │   ├── outputs/                # 六张标准化 CSV 和 validation register
-│   ├── figures/                # EDA 生成的 Figure 1–7
+│   ├── figures/                # EDA 生成的 Figure 1–8
 │   ├── report/                 # PDF 生成过程中使用的 HTML 报告
 │   └── assets/                 # 报告使用的校徽等静态资源
 ├── AI_records/                 # AI 对话记录、AI index 和待签署声明工作文件
@@ -39,7 +39,7 @@ python3 processing/code/Group030_solution.py
 python3 processing/code/Group030_EDA.py
 ```
 
-第一条命令从原始 JSON 和 XML 重新生成六张标准化 CSV 及 validation register。第二条命令从六张 CSV 重新生成 Figure 1–7 和 EDA PDF。两个流程均可离线运行。
+第一条命令从原始 JSON 和 XML 重新生成六张标准化 CSV 及 validation register。第二条命令从六张 CSV 重新生成 Figure 1–8 和 EDA PDF。两个流程均可离线运行。
 
 两份主要 Notebook 位于 `processing/notebooks/`，均为可以独立运行的完整版本，不会反向导入对应 Python 文件中的主流程。
 
@@ -65,4 +65,4 @@ python3 processing/code/build/build_final_submission.py
 - 所有组员已经签署 `Group030_AI_declaration.pdf`；
 - 真实、完整的 AI 对话记录和英文 AI index 已放在 `AI_records/`；
 - 两份 Notebook 已完成 Restart & Run All；
-- 六张 CSV、七张图和最终 PDF 均由当前版本代码重新生成。
+- 六张 CSV、八张图和最终 PDF 均由当前版本代码重新生成。

@@ -6,7 +6,7 @@
 - [x] Text public cases pass 18/18; eight additional near-match/Unicode cases pass.
 - [x] Validation register reports 64/64 PASS and includes an explicit `check` field.
 - [x] Mapping has all 111 required rows and no blank core evidence fields.
-- [x] EDA PDF has 7 assessed figures, exactly 10 findings and exactly 5 ML questions in 10 pages.
+- [x] EDA PDF has 8 assessed figures, exactly 10 findings and exactly 5 ML questions in 9 pages.
 - [x] Raw JSON/XML files are excluded from Git and must be excluded from the Moodle ZIP.
 - [ ] All members fill and sign `Group030_AI_declaration.pdf`.
 - [ ] Export this complete assignment conversation and add it with `Group030_AI_index.pdf` under `AI_records/`.

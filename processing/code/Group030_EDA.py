@@ -1,459 +1,823 @@
 """EDA code exported cell-by-cell from Group030_EDA.ipynb."""
 
 from pathlib import Path
-import math
+import os
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.ticker import FuncFormatter, PercentFormatter
+from matplotlib.ticker import FuncFormatter, PercentFormatter, MaxNLocator
+from IPython.display import Image, display
 
-GROUP_ID = 'Group030'
-PROJECT_ROOT = Path.cwd()
-if (PROJECT_ROOT / 'processing' / 'outputs').is_dir():
-    OUTPUT_DIR = PROJECT_ROOT / 'processing' / 'outputs'
-    FIGURE_DIR = PROJECT_ROOT / 'processing' / 'figures'
+GROUP_ID = "Group030"
+BASE = Path.cwd()
+if (BASE / "processing" / "outputs").is_dir():
+    OUTPUT_DIR = BASE / "processing" / "outputs"
+    FIGURE_DIR = BASE / "processing" / "figures"
+elif (BASE.parent.parent / "processing" / "outputs").is_dir():
+    BASE = BASE.parent.parent
+    OUTPUT_DIR = BASE / "processing" / "outputs"
+    FIGURE_DIR = BASE / "processing" / "figures"
 else:
-    OUTPUT_DIR = PROJECT_ROOT / 'outputs'
-    FIGURE_DIR = PROJECT_ROOT / 'figures'
+    OUTPUT_DIR = BASE / "outputs"
+    FIGURE_DIR = BASE / "figures"
 
 FIGURE_DIR.mkdir(parents=True, exist_ok=True)
-TABLE_NAMES = ['orders', 'order_items', 'customers', 'deliveries', 'products', 'product_reviews']
+DATA = str(OUTPUT_DIR)
+FIGS = str(FIGURE_DIR)
+print("Reading standardised tables from:", os.path.relpath(OUTPUT_DIR, Path.cwd()))
+print("Writing assessed figures to:", os.path.relpath(FIGURE_DIR, Path.cwd()))
 
-BLUE = '#2F6690'
-LIGHT_BLUE = '#8CB9D9'
-ORANGE = '#D97732'
-GREEN = '#4C956C'
-PURPLE = '#7A6FA8'
-DARK = '#243746'
-GREY = '#7B8794'
-PALE = '#E9EFF4'
+# ----------------------------------------------------------------- styling ---
+INK = "#1a1a1a"
+MUTED = "#6b7280"
+GRID = "#e5e7eb"
+BLUE = "#2563eb"
+TEAL = "#0d9488"
+AMBER = "#d97706"
+ROSE = "#e11d48"
+VIOLET = "#7c3aed"
+SLATE = "#475569"
+SEQ = [BLUE, TEAL, AMBER, ROSE, VIOLET, SLATE, "#0891b2", "#ca8a04",
+       "#be123c", "#4338ca"]
 
 plt.rcParams.update({
-    'figure.figsize': (10, 5.8),
-    'figure.dpi': 120,
-    'axes.titlesize': 14,
-    'axes.titleweight': 'bold',
-    'axes.labelsize': 11,
-    'axes.edgecolor': '#C6D0D8',
-    'axes.spines.top': False,
-    'axes.spines.right': False,
-    'axes.grid': False,
-    'xtick.labelsize': 9.5,
-    'ytick.labelsize': 9.5,
-    'legend.frameon': False,
-    'font.family': 'DejaVu Sans',
+    "figure.dpi": 150, "savefig.dpi": 150, "savefig.bbox": "tight",
+    "font.family": "DejaVu Sans", "font.size": 9,
+    "text.color": INK, "axes.labelcolor": INK,
+    "axes.edgecolor": "#9ca3af", "axes.linewidth": 0.8,
+    "xtick.color": "#374151", "ytick.color": "#374151",
+    "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.7,
+    "axes.axisbelow": True, "figure.facecolor": "white",
+    "axes.facecolor": "white", "legend.frameon": False,
 })
 
-aud = FuncFormatter(lambda value, _: f'${value/1000:,.0f}k' if abs(value) >= 1000 else f'${value:,.0f}')
-aud_k1 = FuncFormatter(lambda value, _: f'${value/1000:,.1f}k')
 
-tables = {
-    name: pd.read_csv(
-        OUTPUT_DIR / f'{GROUP_ID}_{name}_standardised.csv',
-        keep_default_na=False,
-    )
-    for name in TABLE_NAMES
-}
-
-table_sizes = pd.DataFrame([
-    {'table': name, 'rows': len(frame), 'columns': len(frame.columns)}
-    for name, frame in tables.items()
-])
-table_sizes
-
-orders = tables['orders'].copy()
-order_items = tables['order_items'].copy()
-customers = tables['customers'].copy()
-deliveries = tables['deliveries'].copy()
-products = tables['products'].copy()
-reviews = tables['product_reviews'].copy()
-
-for field in ['order_price', 'order_total', 'coupon_discount', 'delivery_charges']:
-    orders[field] = pd.to_numeric(orders[field])
-for field in ['quantity', 'unit_price', 'line_revenue']:
-    order_items[field] = pd.to_numeric(order_items[field])
-for field in ['unit_cost', 'unit_price']:
-    products[field] = pd.to_numeric(products[field])
-for field in ['rating', 'review_length_chars', 'helpful_votes']:
-    reviews[field] = pd.to_numeric(reviews[field])
-for field in ['fulfilment_hours', 'delay_days']:
-    deliveries[field] = pd.to_numeric(deliveries[field])
-
-orders['order_timestamp'] = pd.to_datetime(orders['order_timestamp'])
-reviews['review_timestamp'] = pd.to_datetime(reviews['review_timestamp'])
-for field in ['dispatch_date', 'promised_date', 'delivered_date']:
-    deliveries[field] = pd.to_datetime(deliveries[field])
-deliveries['otif'] = deliveries['on_time_in_full'].astype(str).eq('True')
-
-key_checks = pd.DataFrame([
-    {'table': 'orders', 'key': 'order_id', 'rows': len(orders), 'unique_keys': orders.order_id.nunique()},
-    {'table': 'order_items', 'key': 'order_item_id', 'rows': len(order_items), 'unique_keys': order_items.order_item_id.nunique()},
-    {'table': 'customers', 'key': 'customer_id', 'rows': len(customers), 'unique_keys': customers.customer_id.nunique()},
-    {'table': 'deliveries', 'key': 'delivery_id', 'rows': len(deliveries), 'unique_keys': deliveries.delivery_id.nunique()},
-    {'table': 'products', 'key': 'product_id', 'rows': len(products), 'unique_keys': products.product_id.nunique()},
-    {'table': 'product_reviews', 'key': 'review_id', 'rows': len(reviews), 'unique_keys': reviews.review_id.nunique()},
-])
-key_checks['unique'] = key_checks.rows.eq(key_checks.unique_keys)
-assert key_checks['unique'].all()
-key_checks
-
-def checked_many_to_one(left, right, key, label):
-    before = len(left)
-    joined = left.merge(right, on=key, how='left', validate='many_to_one')
-    after = len(joined)
-    assert before == after, f'{label}: the join changed the left-table grain'
-    assert joined[right.columns.difference([key])].notna().any(axis=1).all(), f'{label}: unmatched parent key'
-    return joined, {'join': label, 'rows_before': before, 'rows_after': after}
-
-def mean_summary(frame, group, value):
-    result = frame.groupby(group, observed=True)[value].agg(['count', 'mean', 'std']).reset_index()
-    result['ci95'] = 1.96 * result['std'] / np.sqrt(result['count'])
-    return result
+def finish(ax, title=None, xlabel=None, ylabel=None, xgrid=False):
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    ax.grid(axis="x" if xgrid else "y", alpha=0.9)
+    ax.grid(axis="y" if xgrid else "x", visible=False)
+    if title:
+        ax.set_title(title, fontsize=10.5, fontweight="bold", loc="left", pad=8)
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize=9, color=MUTED)
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=9, color=MUTED)
 
 
-def wilson_interval(successes, total, z=1.96):
-    proportion = successes / total
-    denominator = 1 + z**2 / total
-    centre = (proportion + z**2 / (2 * total)) / denominator
-    half = z * math.sqrt(proportion * (1 - proportion) / total + z**2 / (4 * total**2)) / denominator
-    return centre - half, centre + half
+def frame(fig, num, question, unit, tables, note):
+    """Keep report prose outside the PNG so the plotted area stays readable."""
+    return None
 
 
-def save_figure(fig, number):
-    fig.savefig(FIGURE_DIR / f'Figure_{number}.png', dpi=200, bbox_inches='tight', facecolor='white')
+def save(fig, num, slug):
+    descriptive_path = FIGURE_DIR / f"Figure_{num}_{slug}.png"
+    report_path = FIGURE_DIR / f"Figure_{num}.png"
+    fig.savefig(descriptive_path, facecolor="white")
+    fig.savefig(report_path, facecolor="white")
+    plt.show()
+    plt.close(fig)
+    print(f"saved {report_path.name} and {descriptive_path.name}")
 
-order_value_summary = orders.order_total.describe(percentiles=[0.25, 0.50, 0.75, 0.90]).to_frame('AUD')
-order_value_summary
 
-median_total = orders.order_total.median()
-p90_total = orders.order_total.quantile(0.90)
+money = FuncFormatter(lambda v, _: f"${v:,.0f}")
+money_k = FuncFormatter(lambda v, _: f"${v/1e3:,.0f}k")
+money_m = FuncFormatter(lambda v, _: f"${v/1e6:,.1f}M")
 
-fig1, ax = plt.subplots(figsize=(10, 5.6))
-ax.hist(orders.order_total, bins=36, color=BLUE, edgecolor='white', linewidth=0.7)
-ax.axvline(median_total, color=ORANGE, linestyle='--', linewidth=2, label=f'Median  ${median_total:,.0f}')
-ax.axvline(p90_total, color=PURPLE, linestyle='--', linewidth=2, label=f'90th percentile  ${p90_total:,.0f}')
-ax.set_title('Figure 1. Order value is strongly right-skewed')
-ax.set_xlabel('Net order total (AUD)')
-ax.set_ylabel('Number of orders')
-ax.xaxis.set_major_formatter(aud)
-ax.grid(axis='y', color=PALE, linewidth=0.8)
-ax.legend(loc='upper right')
-fig1.tight_layout()
-save_figure(fig1, 1)
-plt.show()
+# -------------------------------------------------------------------- load ---
+L = lambda n: pd.read_csv(f"{DATA}/Group030_{n}_standardised.csv",
+                          keep_default_na=False)
+orders = L("orders")
+items = L("order_items")
+customers = L("customers")
+deliveries = L("deliveries")
+products = L("products")
+reviews = L("product_reviews")
 
-discount_order = [0, 5, 10, 15, 20, 25]
-discount_summary = orders.groupby('coupon_discount').order_price.agg(
-    orders='size', mean='mean', median='median',
-    q1=lambda values: values.quantile(0.25),
-    q3=lambda values: values.quantile(0.75),
-    std='std',
-).reindex(discount_order)
-discount_summary['mean_ci95'] = 1.96 * discount_summary['std'] / np.sqrt(discount_summary['orders'])
-discount_summary.round(2)
+for df, cols in [(orders, ["order_price", "order_total", "delivery_charges",
+                           "coupon_discount", "tax_amount"]),
+                 (items, ["quantity", "unit_price", "line_revenue"]),
+                 (customers, ["lifetime_value_before_period", "prior_12m_orders"]),
+                 (deliveries, ["delay_days", "shipping_distance_km",
+                               "fulfilment_hours", "delivery_cost"]),
+                 (products, ["unit_price", "unit_cost", "weight_kg"]),
+                 (reviews, ["rating", "helpful_votes", "review_length_chars",
+                            "review_word_count"])]:
+    for c in cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
 
-fig2, (ax_dist, ax_mean) = plt.subplots(2, 1, figsize=(10.5, 7.6), sharex=True,
-                                           gridspec_kw={'height_ratios': [1.7, 1]})
-box_data = [orders.loc[orders.coupon_discount.eq(level), 'order_price'] for level in discount_order]
-box = ax_dist.boxplot(box_data, positions=discount_order, widths=3.2, patch_artist=True,
-                 showfliers=False, medianprops={'color': DARK, 'linewidth': 1.8},
-                 whiskerprops={'color': GREY}, capprops={'color': GREY})
-for patch in box['boxes']:
-    patch.set_facecolor(LIGHT_BLUE)
-    patch.set_alpha(0.65)
+orders["ts"] = pd.to_datetime(orders["order_timestamp"])
+deliveries["on_time_in_full"] = deliveries["on_time_in_full"].astype(str) == "True"
+reviews["contains_non_latin_script"] = (
+    reviews["contains_non_latin_script"].astype(str) == "True")
 
-ax_mean.errorbar(discount_order, discount_summary['mean'], yerr=discount_summary['mean_ci95'],
-                 fmt='o', color=DARK, ecolor=BLUE, elinewidth=2, capsize=6,
-                 capthick=2, markersize=7, label='Mean and 95% CI')
-ci_low = (discount_summary['mean'] - discount_summary['mean_ci95']).min()
-ci_high = (discount_summary['mean'] + discount_summary['mean_ci95']).max()
-ci_pad = max(60, (ci_high - ci_low) * 0.18)
-ax_mean.set_ylim(ci_low - ci_pad, ci_high + ci_pad)
-for level, row in discount_summary.iterrows():
-    ax_mean.text(level, ci_low - ci_pad * 0.72, f"n={int(row['orders']):,}",
-                 ha='center', va='bottom', fontsize=8.5, color=GREY)
+print("=" * 78)
+print("GRAIN CHECKS BEFORE JOINING")
+print("=" * 78)
+TOTAL_REV = round(items["line_revenue"].sum(), 2)
+print(f"orders            : {len(orders):>6,} rows, {orders.order_id.nunique():>6,} distinct order_id")
+print(f"order_items       : {len(items):>6,} rows, {items.order_item_id.nunique():>6,} distinct order_item_id")
+print(f"customers         : {len(customers):>6,} rows, {customers.customer_id.nunique():>6,} distinct customer_id")
+print(f"deliveries        : {len(deliveries):>6,} rows, {deliveries.order_id.nunique():>6,} distinct order_id (1:1 with orders)")
+print(f"products          : {len(products):>6,} rows, {products.product_id.nunique():>6,} distinct product_id")
+print(f"product_reviews   : {len(reviews):>6,} rows, {reviews.review_id.nunique():>6,} distinct review_id")
+print(f"\ncontrol total: sum(order_items.line_revenue) = ${TOTAL_REV:,.2f}")
+print(f"             : sum(orders.order_price)       = ${orders.order_price.sum():,.2f}")
 
-ax_dist.set_title('Figure 2. Gross basket distributions overlap across discount levels')
-ax_dist.set_ylabel('Gross basket value (AUD)')
-ax_dist.yaxis.set_major_formatter(aud)
-ax_dist.grid(axis='y', color=PALE, linewidth=0.8)
-ax_mean.set_title('Mean comparison on an enlarged scale', fontsize=11)
-ax_mean.set_xlabel('Coupon discount (percentage points)')
-ax_mean.set_ylabel('Mean gross value (AUD)')
-ax_mean.yaxis.set_major_formatter(FuncFormatter(lambda value, position: f'${value / 1000:.1f}k'))
-ax_mean.grid(axis='y', color=PALE, linewidth=0.8)
-ax_mean.legend(loc='upper left')
-fig2.tight_layout()
-save_figure(fig2, 2)
-plt.show()
+# =============================================================================
+# FIGURE 1 - univariate distribution and composition
+# =============================================================================
+print("\nFigure 1 ...")
+fig = plt.figure(figsize=(12.5, 7.4))
+gs = fig.add_gridspec(2, 3, height_ratios=[1.35, 1], hspace=0.55, wspace=0.30,
+                      left=0.065, right=0.985, top=0.855, bottom=0.190)
 
-item_product, figure3_join = checked_many_to_one(
-    order_items,
-    products[['product_id', 'category', 'unit_cost']],
-    'product_id',
-    'order items to products',
-)
-figure3_join
+ax = fig.add_subplot(gs[0, :2])
+vals = orders["order_total"]
+ax.hist(vals, bins=60, color=BLUE, alpha=0.85, edgecolor="white", linewidth=0.4)
+ax.axvline(vals.median(), color=ROSE, lw=1.8, ls="--",
+           label=f"Median  ${vals.median():,.0f}")
+ax.axvline(vals.mean(), color=AMBER, lw=1.8, ls=":",
+           label=f"Mean  ${vals.mean():,.0f}")
+ax.xaxis.set_major_formatter(money)
+ax.legend(fontsize=8.5, loc="upper right")
+finish(ax, "Order value is strongly right-skewed",
+       "Order total (AUD, GST-inclusive)", "Number of orders")
 
-item_product['estimated_margin'] = (
-    item_product['line_revenue'] - item_product['quantity'] * item_product['unit_cost']
-)
-category_summary = item_product.groupby('category').agg(
-    lines=('order_item_id', 'size'),
-    revenue=('line_revenue', 'sum'),
-    estimated_margin=('estimated_margin', 'sum'),
-).sort_values('estimated_margin')
-category_summary['margin_rate'] = category_summary.estimated_margin / category_summary.revenue
-category_summary.round(3)
+ax = fig.add_subplot(gs[0, 2])
+q = vals.quantile([.25, .5, .75, .9, .99])
+ax.boxplot([vals], vert=True, widths=0.45, patch_artist=True,
+           boxprops=dict(facecolor=BLUE, alpha=0.35, edgecolor=BLUE),
+           medianprops=dict(color=ROSE, lw=2),
+           whiskerprops=dict(color=SLATE), capprops=dict(color=SLATE),
+           flierprops=dict(marker="o", ms=2, alpha=0.25,
+                           markerfacecolor=SLATE, markeredgecolor="none"))
+ax.set_xticks([])
+ax.yaxis.set_major_formatter(money)
+finish(ax, "Spread and outliers", None, "Order total (AUD)")
+ax.text(0.04, 0.97,
+        f"P25  ${q[.25]:,.0f}\nP50  ${q[.5]:,.0f}\nP75  ${q[.75]:,.0f}\n"
+        f"P99  ${q[.99]:,.0f}\nMax  ${vals.max():,.0f}",
+        transform=ax.transAxes, ha="left", va="top", fontsize=8, color=SLATE,
+        linespacing=1.5)
 
-fig3, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(12, 6.2), sharey=True,
-                                         gridspec_kw={'width_ratios': [1.45, 1]})
-y = np.arange(len(category_summary))
-ax_left.set_axisbelow(True)
-ax_left.barh(y, category_summary.estimated_margin, color=BLUE, alpha=0.95, zorder=3)
-ax_left.set_yticks(y, category_summary.index)
-ax_left.set_xlabel('Estimated margin contribution (AUD)')
-ax_left.xaxis.set_major_formatter(aud)
-ax_left.grid(axis='x', color=PALE, linewidth=0.8)
+for j, (col, ttl) in enumerate([("sales_channel", "Sales channel"),
+                                ("payment_method", "Payment method"),
+                                ("season", "Season")]):
+    ax = fig.add_subplot(gs[1, j])
+    s = orders[col].value_counts().sort_values()
+    pct = 100 * s / len(orders)
+    ax.barh(s.index, pct, color=SEQ[j], alpha=0.85, height=0.6)
+    for k, (lab, v) in enumerate(pct.items()):
+        ax.text(v + 0.6, k, f"{v:.1f}%", va="center", fontsize=8, color=SLATE)
+    ax.set_xlim(0, max(pct) * 1.30)
+    ax.xaxis.set_major_formatter(PercentFormatter())
+    ax.xaxis.set_major_locator(MaxNLocator(4))
+    finish(ax, ttl, "Share of orders", None, xgrid=True)
+    ax.tick_params(labelsize=8.5)
 
-ax_right.scatter(category_summary.margin_rate * 100, y, color=ORANGE, s=55, zorder=3)
-ax_right.axvline(category_summary.estimated_margin.sum() / category_summary.revenue.sum() * 100,
-                 color=GREY, linestyle='--', linewidth=1.4, label='Overall rate')
-ax_right.set_xlabel('Estimated margin rate (%)')
-ax_right.set_xlim(35.5, 40.5)
-ax_right.xaxis.set_major_formatter(PercentFormatter(100, decimals=1))
-ax_right.grid(axis='x', color=PALE, linewidth=0.8)
-ax_right.legend(loc='lower right')
+frame(fig, 1, "How are order values distributed, and how is order volume composed?",
+      "one row per canonical order; denominator = 5,000 orders",
+      "orders (no join required)",
+      f"Result: order value is right-skewed (median ${vals.median():,.0f} vs mean ${vals.mean():,.0f}; P99 ${q[.99]:,.0f}), so the mean overstates a typical basket and "
+      "median is the correct central measure. Channel, payment and season shares are all near-uniform (32-35% / 24-26% / 24-25%), "
+      "indicating no dominant route to market.\n"
+      "Limitation: the histogram mixes baskets of 1-5 line items, so the right tail reflects basket size as much as price; "
+      "composition counts orders, not revenue, so a uniform share does not imply equal revenue contribution.")
+save(fig, 1, "order_value_distribution_and_composition")
 
-fig3.suptitle('Figure 3. Category scale and estimated margin rate tell different stories', y=1.01,
-              fontsize=14, fontweight='bold')
-fig3.tight_layout()
-save_figure(fig3, 3)
-plt.show()
+# =============================================================================
+# FIGURE 2 - bivariate group comparison  (JOIN orders -> customers)
+# =============================================================================
+print("Figure 2 ...")
+before = len(orders)
+oc = orders.merge(customers[["customer_id", "customer_segment", "loyalty_tier",
+                             "age_band", "lifetime_value_before_period"]],
+                  on="customer_id", how="left", validate="many_to_one")
+print(f"  grain check: orders {before:,} -> after join {len(oc):,} "
+      f"(many_to_one on customer_id; unchanged = no row multiplication)")
+assert len(oc) == before
 
-orders['month'] = orders.order_timestamp.dt.to_period('M')
-monthly = orders.groupby('month').agg(
-    orders=('order_id', 'size'),
-    mean_order_total=('order_total', 'mean'),
-).reset_index()
-monthly['calendar_days'] = monthly.month.dt.days_in_month
-monthly['orders_per_day'] = monthly.orders / monthly.calendar_days
-monthly['month_label'] = monthly.month.astype(str)
-monthly[['month_label', 'orders', 'calendar_days', 'orders_per_day', 'mean_order_total']].round(2)
+fig = plt.figure(figsize=(12.5, 7.0))
+gs = fig.add_gridspec(1, 3, width_ratios=[1.25, 1.25, 1], wspace=0.30,
+                      left=0.065, right=0.985, top=0.850, bottom=0.230)
 
-fig4, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
-x = np.arange(len(monthly))
-ax_top.plot(x, monthly.orders_per_day, color=BLUE, marker='o', linewidth=2.2)
-ax_top.fill_between(x, monthly.orders_per_day, monthly.orders_per_day.mean(), color=LIGHT_BLUE, alpha=0.22)
-ax_top.axhline(monthly.orders_per_day.mean(), color=GREY, linestyle='--', linewidth=1.2, label='Annual daily average')
-ax_top.set_ylabel('Orders per calendar day')
-ax_top.grid(axis='y', color=PALE, linewidth=0.8)
-ax_top.legend(loc='lower right')
+seg_order = oc.groupby("customer_segment")["order_total"].median().sort_values().index
+ax = fig.add_subplot(gs[0, 0])
+data = [oc.loc[oc.customer_segment == s, "order_total"] for s in seg_order]
+bp = ax.boxplot(data, vert=True, widths=0.55, patch_artist=True, showfliers=False)
+for k, b in enumerate(bp["boxes"]):
+    b.set(facecolor=SEQ[k], alpha=0.35, edgecolor=SEQ[k])
+for m in bp["medians"]:
+    m.set(color=INK, lw=1.8)
+ax.set_xticklabels([s.replace(" ", "\n") for s in seg_order], fontsize=8.5)
+ax.yaxis.set_major_formatter(money_k)
+for k, s in enumerate(seg_order):
+    n = (oc.customer_segment == s).sum()
+    ax.text(k + 1, ax.get_ylim()[0], f"n={n:,}", ha="center", va="bottom",
+            fontsize=7.6, color=MUTED)
+finish(ax, "Order value by customer segment", "Customer segment", "Order total (AUD)")
 
-ax_bottom.plot(x, monthly.mean_order_total, color=ORANGE, marker='o', linewidth=2.2)
-ax_bottom.axhline(orders.order_total.mean(), color=GREY, linestyle='--', linewidth=1.2, label='Annual mean order value')
-ax_bottom.set_ylabel('Mean order total (AUD)')
-ax_bottom.yaxis.set_major_formatter(aud_k1)
-ax_bottom.set_xticks(x, monthly.month_label.str[-2:])
-ax_bottom.set_xlabel('Month in 2018')
-ax_bottom.grid(axis='y', color=PALE, linewidth=0.8)
-ax_bottom.legend(loc='lower right')
+tier_order = ["Bronze", "Silver", "Gold", "Platinum"]
+ax = fig.add_subplot(gs[0, 1])
+means = oc.groupby("loyalty_tier")["order_total"].agg(["mean", "sem", "count"]).reindex(tier_order)
+ax.bar(tier_order, means["mean"], yerr=1.96 * means["sem"], capsize=4,
+       color=[SEQ[i] for i in range(4)], alpha=0.85, width=0.6,
+       error_kw=dict(ecolor=SLATE, lw=1.2))
+for k, (m, n) in enumerate(zip(means["mean"], means["count"])):
+    ax.text(k, m + 130, f"${m:,.0f}", ha="center", fontsize=8.5,
+            fontweight="bold", color=INK)
+    ax.text(k, 90, f"n={int(n):,}", ha="center", fontsize=7.6, color="white")
+ax.set_ylim(0, means["mean"].max() * 1.30)
+ax.yaxis.set_major_formatter(money)
+ax.yaxis.set_major_locator(MaxNLocator(5))
+finish(ax, "Mean order value by loyalty tier (95% CI)", "Loyalty tier",
+       "Mean order total (AUD)")
 
-fig4.suptitle('Figure 4. Daily order frequency and average value vary differently by month', y=0.98,
-              fontsize=14, fontweight='bold')
-fig4.tight_layout()
-save_figure(fig4, 4)
-plt.show()
+ax = fig.add_subplot(gs[0, 2])
+cust = (orders.groupby("customer_id")
+        .agg(orders_n=("order_id", "count"), revenue=("order_total", "sum"))
+        .merge(customers.set_index("customer_id")[["loyalty_tier"]],
+               left_index=True, right_index=True))
+for k, t in enumerate(tier_order):
+    s = cust[cust.loyalty_tier == t]
+    ax.scatter(s.orders_n, s.revenue, s=16, alpha=0.65, color=SEQ[k],
+               label=f"{t} (n={len(s)})", edgecolors="none")
+ax.yaxis.set_major_formatter(money_k)
+ax.legend(fontsize=7.6, loc="upper left", handletextpad=0.3)
+finish(ax, "Customer revenue vs order count", "Orders placed in 2018",
+       "Total revenue (AUD)")
 
-current_frequency = orders.groupby('customer_id').agg(
-    current_orders=('order_id', 'size')
-).reset_index()
-customer_frequency = customers[['customer_id', 'prior_12m_orders']].merge(
-    current_frequency, on='customer_id', how='left', validate='one_to_one'
-)
-customer_frequency['current_orders'] = customer_frequency.current_orders.fillna(0).astype(int)
-customer_frequency['prior_12m_orders'] = pd.to_numeric(customer_frequency.prior_12m_orders)
-assert len(customer_frequency) == len(customers)
-frequency_correlation = customer_frequency.prior_12m_orders.corr(customer_frequency.current_orders)
-customer_frequency.describe().round(2)
+_segmed = oc.groupby("customer_segment").order_total.median()
+frame(fig, 2, "Do customer segment and loyalty tier explain order value?",
+      "left/centre: one row per order, n=5,000; right: one row per customer, n=500",
+      "orders \u22c8 customers on customer_id (many-to-one; row count verified unchanged at 5,000)",
+      f"Result: a genuine null. Median order value spans only ${_segmed.max()-_segmed.min():,.0f} across all four segments and the "
+      f"loyalty-tier means (${means['mean'].min():,.0f}-${means['mean'].max():,.0f}) have overlapping 95% confidence intervals, so "
+      f"neither attribute predicts basket size. Customer-level "
+      "revenue is instead driven almost entirely by order frequency (right panel), which fans out linearly with no tier separation.\n"
+      "Limitation: 5,000 orders over only 500 customers averages 10 orders each, so segment cells are wide but customer-level "
+      "points are few; a single 2018 period cannot separate tier effects from tenure, and tier is recorded as-at export, not as-at order.")
+save(fig, 2, "order_value_by_segment_and_loyalty")
 
-fig5, ax = plt.subplots(figsize=(9.5, 6))
-hexes = ax.hexbin(customer_frequency.prior_12m_orders, customer_frequency.current_orders,
-                  gridsize=18, mincnt=1, cmap='Blues', linewidths=0.3)
-coef = np.polyfit(customer_frequency.prior_12m_orders, customer_frequency.current_orders, 1)
-line_x = np.linspace(customer_frequency.prior_12m_orders.min(), customer_frequency.prior_12m_orders.max(), 100)
-ax.plot(line_x, np.polyval(coef, line_x), color=DARK, linewidth=2.2,
-        label=f'Linear summary, Pearson r = {frequency_correlation:.2f}')
-colourbar = fig5.colorbar(hexes, ax=ax, pad=0.02)
-colourbar.set_label('Customers in hexagon')
-ax.set_title('Figure 5. Prior frequency is a weak guide to current ordering')
-ax.set_xlabel('Orders in the prior 12 months')
-ax.set_ylabel('Orders in the current period')
-ax.legend(loc='upper left')
-fig5.tight_layout()
-save_figure(fig5, 5)
-plt.show()
+# =============================================================================
+# FIGURE 3 - multivariate  (JOIN order_items -> products)  GRAIN CRITICAL
+# =============================================================================
+print("Figure 3 ...")
+before = len(items)
+ip = items.merge(products[["product_id", "category", "brand", "unit_cost"]],
+                 on="product_id", how="left", validate="many_to_one")
+print(f"  grain check: order_items {before:,} -> after join {len(ip):,} "
+      f"(many_to_one on product_id; unchanged)")
+print(f"  revenue control: joined ${ip.line_revenue.sum():,.2f} vs source ${TOTAL_REV:,.2f} "
+      f"-> {'MATCH' if abs(ip.line_revenue.sum()-TOTAL_REV) < 0.01 else 'MISMATCH'}")
+naive = orders.merge(items, on="order_id").merge(
+    products[["product_id", "category"]], on="product_id")
+print(f"  DOUBLE-COUNT DEMO: summing orders.order_total across the "
+      f"orders\u22c8items\u22c8products fan-out gives ${naive.order_total.sum():,.0f} "
+      f"({naive.order_total.sum()/orders.order_total.sum():.2f}x the true "
+      f"${orders.order_total.sum():,.0f}) - order-grain metrics must NOT be summed at item grain")
 
-operations = deliveries.groupby(['carrier', 'service_level']).agg(
-    otif_successes=('otif', 'sum'),
-    deliveries=('delivery_id', 'size'),
-    otif_rate=('otif', 'mean'),
-    median_fulfilment=('fulfilment_hours', 'median'),
-).reset_index()
-intervals = np.array([
-    wilson_interval(successes, total)
-    for successes, total in zip(operations.otif_successes, operations.deliveries)
-])
-operations['lower'] = intervals[:, 0]
-operations['upper'] = intervals[:, 1]
-operations['label'] = operations.carrier + ' — ' + operations.service_level
-operations = operations.sort_values(['carrier', 'service_level']).reset_index(drop=True)
-operations.round(4)
+cat = (ip.groupby("category")
+       .agg(revenue=("line_revenue", "sum"), units=("quantity", "sum"),
+            lines=("order_item_id", "count"))
+       .assign(asp=lambda d: d.revenue / d.units)
+       .sort_values("revenue", ascending=False))
 
-service_colours = {'Express': ORANGE, 'Standard': BLUE}
-labels = operations.label.tolist()
-y = np.arange(len(labels))
+fig = plt.figure(figsize=(12.5, 7.2))
+gs = fig.add_gridspec(1, 2, width_ratios=[1.20, 1], wspace=0.30,
+                      left=0.115, right=0.980, top=0.855, bottom=0.215)
 
-fig6, (ax_rate, ax_time) = plt.subplots(1, 2, figsize=(13, 6.5), sharey=True,
-                                        gridspec_kw={'width_ratios': [1.05, 1.25]})
-for idx, row in operations.iterrows():
-    colour = service_colours[row.service_level]
-    ax_rate.errorbar(row.otif_rate * 100, idx,
-                     xerr=[[100 * (row.otif_rate - row.lower)], [100 * (row.upper - row.otif_rate)]],
-                     fmt='o', color=colour, capsize=4, markersize=7)
-ax_rate.axvline(deliveries.otif.mean() * 100, color=GREY, linestyle='--', linewidth=1.3,
-                label=f'Overall {deliveries.otif.mean():.1%}')
-ax_rate.set_yticks(y, labels)
-ax_rate.set_xlabel('OTIF rate (95% Wilson CI)')
-ax_rate.xaxis.set_major_formatter(PercentFormatter(100, decimals=0))
-ax_rate.grid(axis='x', color=PALE, linewidth=0.8)
+# --- paired share bars: revenue share vs unit share (no twin axis) -----------
+ax = fig.add_subplot(gs[0, 0])
+rev_share = 100 * cat.revenue / cat.revenue.sum()
+unit_share = 100 * cat.units / cat.units.sum()
+y = np.arange(len(cat))
+h = 0.38
+ax.barh(y - h / 2, rev_share, h, color=BLUE, alpha=0.88, label="Share of revenue")
+ax.barh(y + h / 2, unit_share, h, color=AMBER, alpha=0.88, label="Share of units")
+for k in range(len(cat)):
+    ax.text(rev_share.iloc[k] + 0.35, y[k] - h / 2,
+            f"{rev_share.iloc[k]:.1f}%  (${cat.revenue.iloc[k]/1e6:.2f}M)",
+            va="center", fontsize=7.9, color=BLUE)
+    ax.text(unit_share.iloc[k] + 0.35, y[k] + h / 2,
+            f"{unit_share.iloc[k]:.1f}%  ({cat.units.iloc[k]:,} u)",
+            va="center", fontsize=7.9, color="#a16207")
+ax.set_yticks(y)
+ax.set_yticklabels(cat.index, fontsize=8.9)
+ax.invert_yaxis()
+ax.set_xlim(0, max(rev_share.max(), unit_share.max()) * 1.52)
+ax.xaxis.set_major_formatter(PercentFormatter())
+ax.xaxis.set_major_locator(MaxNLocator(6))
+ax.legend(fontsize=8.4, loc="center right", bbox_to_anchor=(1.0, 0.52))
+finish(ax, "Revenue share and unit share rank almost inversely",
+       "Share of total (revenue $16.12M / units 41,993)", None, xgrid=True)
 
-fulfilment_groups = [
-    deliveries.loc[
-        deliveries.carrier.eq(row.carrier) & deliveries.service_level.eq(row.service_level),
-        'fulfilment_hours'
-    ]
-    for _, row in operations.iterrows()
-]
-box = ax_time.boxplot(fulfilment_groups, orientation='horizontal', positions=y, widths=0.58,
-                      showfliers=False, patch_artist=True,
-                      medianprops={'color': DARK, 'linewidth': 1.6},
-                      whiskerprops={'color': GREY}, capprops={'color': GREY})
-for patch, service in zip(box['boxes'], operations.service_level):
-    patch.set_facecolor(service_colours[service])
-    patch.set_alpha(0.42)
-ax_time.set_xlabel('Fulfilment hours (median and IQR)')
-ax_time.grid(axis='x', color=PALE, linewidth=0.8)
-ax_rate.set_yticks(y, labels)
-ax_time.tick_params(axis='y', labelleft=False)
-service_legend = [
-    Line2D([0], [0], marker='o', color='none', markerfacecolor=ORANGE, markeredgecolor=ORANGE, label='Express'),
-    Line2D([0], [0], marker='o', color='none', markerfacecolor=BLUE, markeredgecolor=BLUE, label='Standard'),
-    Line2D([0], [0], color=GREY, linestyle='--', label=f'Overall {deliveries.otif.mean():.1%}'),
-]
-ax_rate.legend(handles=service_legend, loc='lower right')
+# --- price vs volume ---------------------------------------------------------
+ax = fig.add_subplot(gs[0, 1])
+ax.scatter(cat.units, cat.asp, s=cat.revenue / 4200, alpha=0.55,
+           c=range(len(cat)), cmap="viridis", edgecolors="white", linewidth=1.2)
+offsets = {"Laptop": (0, 22), "Home Entertainment": (0, -30),
+           "Gaming": (46, 12), "Smartphone": (-40, 10), "Tablet": (-34, -20),
+           "Networking": (44, -6), "Wearable": (40, 14), "Audio": (-6, -26),
+           "Smart Home": (44, 8), "Accessory": (0, 22)}
+for name, row in cat.iterrows():
+    ax.annotate(name, (row.units, row.asp), fontsize=8, color=INK,
+                xytext=offsets.get(name, (0, 12)), textcoords="offset points",
+                ha="center")
+ax.set_yscale("log")
+ax.yaxis.set_major_formatter(money)
+ax.yaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+ax.set_yticks([200, 400, 700, 1000, 2000, 3000])
+ax.set_ylim(cat.asp.min() * 0.60, cat.asp.max() * 2.1)
+ax.set_xlim(cat.units.min() * 0.60, cat.units.max() * 1.30)
+finish(ax, "Price-volume trade-off (bubble area = revenue)",
+       "Units sold", "Average selling price (AUD, log scale)")
+ax.text(0.98, 0.97, "High price,\nlow volume", transform=ax.transAxes,
+        ha="right", va="top", fontsize=8, color=MUTED, style="italic")
+ax.text(0.98, 0.06, "Low price,\nhigh volume", transform=ax.transAxes,
+        ha="right", va="bottom", fontsize=8, color=MUTED, style="italic")
 
-fig6.suptitle('Figure 6. Carrier–service reliability varies more than fulfilment time', y=0.98,
-              fontsize=14, fontweight='bold')
-fig6.tight_layout()
-save_figure(fig6, 6)
-plt.show()
+_infl = naive.order_total.sum() / orders.order_total.sum()
+frame(fig, 3, "Which categories drive revenue, and is that volume or price?",
+      "one row per order item; denominator = 15,723 items / 41,993 units / $16.12M line revenue",
+      "order_items \u22c8 products on product_id (many-to-one; rows unchanged at 15,723, revenue control total matched to the cent)",
+      f"Result: revenue and volume rank almost inversely. Home Entertainment and Laptop take {rev_share.iloc[0]+rev_share.iloc[1]:.1f}% of revenue from only "
+      f"{unit_share.iloc[0]+unit_share.iloc[1]:.1f}% of units, while Accessory sells the most units ({cat.units.iloc[-1]:,}) for the least revenue "
+      f"(${cat.revenue.iloc[-1]/1e6:.2f}M) - category value is set by price point, not popularity.\n"
+      f"Limitation: this is 2018 revenue, not margin; unit_cost is available and Accessory may still contribute more profit per unit. Critically, "
+      f"order-grain fields must not be summed at this grain - doing so across the orders-items-products fan-out inflates revenue {_infl:.2f}x "
+      f"(${naive.order_total.sum()/1e6:.1f}M vs the true ${orders.order_total.sum()/1e6:.1f}M).")
+save(fig, 3, "category_revenue_price_volume")
 
-order_rating = reviews.groupby('order_id').agg(
-    order_mean_rating=('rating', 'mean'),
-    review_count=('review_id', 'size'),
-    first_review_timestamp=('review_timestamp', 'min'),
-).reset_index()
+# =============================================================================
+# FIGURE 4 - temporal pattern
+# =============================================================================
+print("Figure 4 ...")
+o = orders.copy()
+o["month"] = o.ts.dt.to_period("M").dt.to_timestamp()
+o["dow"] = o.ts.dt.dayofweek
+o["hour"] = o.ts.dt.hour
+monthly = o.groupby("month").agg(orders_n=("order_id", "count"),
+                                 revenue=("order_total", "sum"),
+                                 aov=("order_total", "mean"))
 
-rating_delivery = order_rating.merge(
-    deliveries[['order_id', 'promised_date', 'delivered_date']],
-    on='order_id', how='inner', validate='one_to_one'
-)
-assert len(rating_delivery) == len(order_rating)
-rating_delivery['timing_days'] = (
-    rating_delivery.delivered_date - rating_delivery.promised_date
-).dt.days
-rating_delivery['delivery_timing'] = np.select(
-    [rating_delivery.timing_days.lt(0), rating_delivery.timing_days.eq(0)],
-    ['Early', 'On promised date'],
-    default='Late',
-)
-rating_delivery['review_lag_days'] = (
-    rating_delivery.first_review_timestamp.dt.normalize() - rating_delivery.delivered_date
-).dt.days
+fig = plt.figure(figsize=(12.5, 7.4))
+gs = fig.add_gridspec(2, 2, height_ratios=[1.3, 1], hspace=0.52, wspace=0.26,
+                      left=0.070, right=0.930, top=0.855, bottom=0.190)
 
-timing_order = ['Early', 'On promised date', 'Late']
-timing_rating = mean_summary(rating_delivery, 'delivery_timing', 'order_mean_rating').set_index('delivery_timing').reindex(timing_order).reset_index()
-rating_delivery['review_lag_band'] = pd.cut(
-    rating_delivery.review_lag_days,
-    bins=[0, 7, 14, 30, np.inf],
-    labels=['1–7', '8–14', '15–30', '31–45'],
-)
-lag_rating = rating_delivery.groupby(['delivery_timing', 'review_lag_band'], observed=True).order_mean_rating.agg(
-    count='size', mean='mean', std='std'
-).reset_index()
-lag_rating['ci95'] = 1.96 * lag_rating['std'] / np.sqrt(lag_rating['count'])
-timing_rating.round(3), lag_rating.round(3)
+ax = fig.add_subplot(gs[0, :])
+ax.bar(monthly.index, monthly.revenue, width=20, color=BLUE, alpha=0.80,
+       label="Monthly revenue (AUD)")
+ax.yaxis.set_major_formatter(money_m)
+mean_rev = monthly.revenue.mean()
+ax.axhline(mean_rev, color=SLATE, ls="--", lw=1.1)
+ax.text(monthly.index[0], mean_rev * 1.02, f"  mean ${mean_rev/1e6:.2f}M",
+        fontsize=8, color=SLATE, va="bottom")
+finish(ax, "Monthly revenue and order count show no seasonal cycle",
+       None, "Revenue (AUD)")
+ax.set_ylim(0, monthly.revenue.max() * 1.22)
 
-timing_colours = {'Early': BLUE, 'On promised date': GREEN, 'Late': ORANGE}
-fig7, (ax_main, ax_lag) = plt.subplots(1, 2, figsize=(13, 5.2), gridspec_kw={'width_ratios': [0.8, 1.5]})
-rating_low = min((timing_rating['mean'] - timing_rating['ci95']).min(),
-                 (lag_rating['mean'] - lag_rating['ci95']).min())
-rating_high = max((timing_rating['mean'] + timing_rating['ci95']).max(),
-                  (lag_rating['mean'] + lag_rating['ci95']).max())
-rating_pad = max(0.08, (rating_high - rating_low) * 0.18)
-zoom_limits = (max(1, rating_low - rating_pad), min(5, rating_high + rating_pad))
+axb = ax.twinx()
+axb.plot(monthly.index, monthly.orders_n, "o-", color=AMBER, lw=1.9, ms=5.5,
+         label="Order count")
+axb.set_ylabel("Orders", fontsize=9, color=AMBER)
+axb.tick_params(axis="y", colors=AMBER)
+axb.set_ylim(0, monthly.orders_n.max() * 1.30)
+axb.grid(False)
+for s in ("top", "left"):
+    axb.spines[s].set_visible(False)
+axb.spines["right"].set_color(AMBER)
+h1, l1 = ax.get_legend_handles_labels()
+h2, l2 = axb.get_legend_handles_labels()
+ax.legend(h1 + h2, l1 + l2, fontsize=8.3, loc="upper right", ncol=2)
+ax.set_xticks(monthly.index)
+ax.set_xticklabels([d.strftime("%b") for d in monthly.index], fontsize=8.5)
+ax.set_xlabel("Month of 2018", fontsize=9, color=MUTED)
 
-x_main = np.arange(len(timing_rating))
-for idx, row in timing_rating.iterrows():
-    ax_main.errorbar(idx, row['mean'], yerr=row.ci95, fmt='o', markersize=8, capsize=5,
-                     color=timing_colours[row.delivery_timing])
-    ax_main.text(idx, zoom_limits[0] + 0.015, f"n={int(row['count']):,}",
-                 ha='center', va='bottom', fontsize=9, color=GREY)
-ax_main.set_xticks(x_main, ['Early', 'On date', 'Late'])
-ax_main.set_ylim(*zoom_limits)
-ax_main.set_ylabel('Mean order-level rating (1–5)')
-ax_main.set_title('A. Delivery timing')
-ax_main.grid(axis='y', color=PALE, linewidth=0.8)
+ax = fig.add_subplot(gs[1, 0])
+dow = o.groupby("dow").size()
+names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+cols = [TEAL if d < 5 else AMBER for d in dow.index]
+ax.bar(names, dow.values, color=cols, alpha=0.85, width=0.62)
+ax.axhline(dow.mean(), color=SLATE, ls="--", lw=1)
+ax.set_ylim(0, dow.max() * 1.30)
+finish(ax, "Orders by day of week", None, "Orders")
+ax.tick_params(labelsize=8.5)
+ax.text(0.99, 0.98, f"weekday mean {dow[:5].mean():.0f}   weekend mean {dow[5:].mean():.0f}",
+        transform=ax.transAxes, ha="right", va="top", fontsize=7.8, color=SLATE)
 
-lag_order = ['1–7', '8–14', '15–30', '31–45']
-x_lag = np.arange(len(lag_order))
-for timing in timing_order:
-    subset = lag_rating.loc[lag_rating.delivery_timing.eq(timing)].set_index('review_lag_band').reindex(lag_order)
-    ax_lag.errorbar(x_lag, subset['mean'], yerr=subset['ci95'], marker='o', capsize=3,
-                    linewidth=1.8, color=timing_colours[timing], label=timing)
-ax_lag.set_xticks(x_lag, lag_order)
-ax_lag.set_ylim(*zoom_limits)
-ax_lag.set_xlabel('Days from delivery to first review')
-ax_lag.set_title('B. Delivery timing by review lag')
-ax_lag.grid(axis='y', color=PALE, linewidth=0.8)
-ax_lag.legend(loc='lower right')
+ax = fig.add_subplot(gs[1, 1])
+hour = o.groupby("hour").size().reindex(range(24), fill_value=0)
+ax.fill_between(hour.index, hour.values, color=VIOLET, alpha=0.30)
+ax.plot(hour.index, hour.values, color=VIOLET, lw=1.9)
+ax.set_xticks(range(0, 24, 3))
+ax.set_xlim(0, 23)
+finish(ax, "Orders by hour of day", "Hour of day (local, 24h)", "Orders")
+peak = hour.idxmax()
+ax.annotate(f"peak {peak:02d}:00", (peak, hour.max()), fontsize=8, color=VIOLET,
+            xytext=(0, 8), textcoords="offset points", ha="center")
 
-fig7.suptitle('Figure 7. Rating differences are small across delivery and review timing', y=1.04,
-              fontsize=14, fontweight='bold')
-fig7.text(0.5, 0.955, 'Enlarged vertical scale; all values remain within the original 1–5 rating scale.',
-          ha='center', fontsize=9.5, color=GREY)
-fig7.tight_layout(rect=[0, 0, 1, 0.91])
-save_figure(fig7, 7)
-plt.show()
+frame(fig, 4, "How does demand move through the year, the week and the day?",
+      "one row per order; denominator = 5,000 orders spanning 2018-01-01 to 2018-12-31",
+      "orders (no join required); order_timestamp normalised to YYYY-MM-DD HH:MM:SS from two source formats",
+      "Result: monthly volume is flat (406-438 orders, a 7.9% peak-to-trough band) with no Q4 or holiday lift, and weekday/weekend "
+      "rates are almost identical. The only real structure is intraday - ordering is concentrated in trading hours and collapses "
+      "overnight, which is the pattern that should drive staffing.\n"
+      "Limitation: a single year cannot separate seasonality from trend, and 'Season' is a supplied label rather than a derived one. "
+      "Timestamps carry no timezone, so the hour axis assumes a single local zone for all channels.")
+save(fig, 4, "temporal_demand_patterns")
+
+# =============================================================================
+# FIGURE 5 - review / text behaviour
+# =============================================================================
+print("Figure 5 ...")
+fig = plt.figure(figsize=(12.5, 7.6))
+gs = fig.add_gridspec(2, 3, height_ratios=[1, 1], hspace=0.52, wspace=0.30,
+                      left=0.070, right=0.985, top=0.855, bottom=0.205)
+
+ax = fig.add_subplot(gs[0, 0])
+rc = reviews.rating.value_counts().sort_index()
+pct = 100 * rc / len(reviews)
+bars = ax.bar(rc.index, pct, color=[ROSE, ROSE, AMBER, TEAL, TEAL], alpha=0.85,
+              width=0.62)
+for x, v in zip(rc.index, pct):
+    ax.text(x, v + 0.7, f"{v:.1f}%", ha="center", fontsize=8.3, color=INK)
+ax.set_ylim(0, pct.max() * 1.22)
+ax.yaxis.set_major_formatter(PercentFormatter())
+ax.set_xticks([1, 2, 3, 4, 5])
+finish(ax, "Ratings skew strongly positive", "Star rating", "Share of reviews")
+
+ax = fig.add_subplot(gs[0, 1:])
+styles = reviews.groupby("writing_style").review_length_chars.median().sort_values().index
+data = [reviews.loc[reviews.writing_style == s, "review_length_chars"] for s in styles]
+bp = ax.boxplot(data, vert=False, widths=0.55, patch_artist=True, showfliers=False)
+for k, b in enumerate(bp["boxes"]):
+    b.set(facecolor=SEQ[k], alpha=0.40, edgecolor=SEQ[k])
+for m in bp["medians"]:
+    m.set(color=INK, lw=1.8)
+ax.set_yticklabels([f"{s}\n(n={int((reviews.writing_style==s).sum()):,})" for s in styles],
+                   fontsize=8.3)
+finish(ax, "Review length is set by writing style, not sentiment",
+       "Review length (characters in review_body_clean)", None, xgrid=True)
+
+ax = fig.add_subplot(gs[1, 0])
+g = reviews.groupby("rating").review_length_chars.agg(["mean", "sem"])
+ax.errorbar(g.index, g["mean"], yerr=1.96 * g["sem"], fmt="o-", color=BLUE,
+            lw=1.8, ms=6, capsize=4, ecolor=SLATE)
+ax.set_xticks([1, 2, 3, 4, 5])
+ax.set_ylim(g["mean"].min() * 0.90, g["mean"].max() * 1.10)
+finish(ax, "Length vs rating (95% CI)", "Star rating", "Mean length (chars)")
+
+ax = fig.add_subplot(gs[1, 1])
+g = reviews.groupby("rating").helpful_votes.agg(["mean", "sem"])
+ax.errorbar(g.index, g["mean"], yerr=1.96 * g["sem"], fmt="o-", color=TEAL,
+            lw=1.8, ms=6, capsize=4, ecolor=SLATE)
+ax.set_xticks([1, 2, 3, 4, 5])
+ax.set_ylim(g["mean"].min() * 0.90, g["mean"].max() * 1.10)
+finish(ax, "Helpfulness vs rating (95% CI)", "Star rating", "Mean helpful votes")
+
+ax = fig.add_subplot(gs[1, 2])
+g = reviews.groupby("value_experience").rating.agg(["mean", "sem", "count"])
+g = g.reindex(["poor_value", "good_value"])
+ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.55,
+       color=[ROSE, TEAL], alpha=0.85, error_kw=dict(ecolor=SLATE, lw=1.2))
+ax.set_xticks(range(len(g)))
+ax.set_xticklabels([f"{i.replace('_',' ')}\n(n={int(n):,})"
+                    for i, n in zip(g.index, g["count"])], fontsize=8.3)
+for k, v in enumerate(g["mean"]):
+    ax.text(k, v + 0.06, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
+ax.set_ylim(0, 4.6)
+finish(ax, "Rating by value perception", None, "Mean star rating")
+
+_len_med = reviews.groupby("writing_style").review_length_chars.median()
+_ve = reviews.groupby("value_experience").rating.mean()
+frame(fig, 5, "What drives review length, helpfulness and star rating?",
+      "one row per canonical product review; denominator = 7,000 reviews",
+      "product_reviews (no join required); review_length_chars derived from review_body_clean per the Task 3 cleaning contract",
+      f"Result: ratings skew positive - {pct[4]+pct[5]:.1f}% are 4-5 star against {pct[1]+pct[2]:.1f}% at 1-2 star, so the mean of "
+      f"{reviews.rating.mean():.2f} falls in a thin 3-star middle that few reviewers actually chose. "
+      f"Length is governed by writing style (median {_len_med['concise']:,.0f} chars for 'concise' vs {_len_med['narrative']:,.0f} for 'narrative', "
+      f"a {_len_med['narrative']/_len_med['concise']:.1f}x gap) and is flat across ratings, as is helpfulness. Only stated value perception moves "
+      f"the rating, and modestly ({_ve['poor_value']:.2f} vs {_ve['good_value']:.2f}).\n"
+      "Limitation: writing_style and value_experience are supplied source labels, not derived from the text, so this shows label-to-outcome "
+      "consistency rather than an independent NLP finding. helpful_votes has no exposure denominator - votes are not normalised by views.")
+save(fig, 5, "review_text_behaviour")
+
+# =============================================================================
+# FIGURE 6 - multilingual text: the script/tokenisation effect
+# =============================================================================
+print("Figure 6 ...")
+fig = plt.figure(figsize=(12.5, 7.0))
+gs = fig.add_gridspec(1, 3, width_ratios=[1.05, 1.15, 1.15], wspace=0.32,
+                      left=0.070, right=0.985, top=0.850, bottom=0.235)
+
+ax = fig.add_subplot(gs[0, 0])
+lang = reviews.language_code.value_counts()
+top = lang.sort_values()
+colors = [ROSE if l == "en" else BLUE for l in top.index]
+ax.barh(top.index, top.values, color=colors, alpha=0.85, height=0.62)
+for k, v in enumerate(top.values):
+    ax.text(v * 1.06, k, f"{v:,}", va="center", fontsize=7.8, color=SLATE)
+ax.set_xscale("log")
+ax.set_xlim(30, lang.max() * 3.4)
+ax.set_xticks([50, 100, 250, 1000, 5000])
+ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
+ax.xaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+finish(ax, "Language mix (log scale)", "Reviews (log scale)", None, xgrid=True)
+ax.tick_params(labelsize=9.2)
+ax.set_ylim(-1.4, len(top) - 0.4)
+ax.text(0.50, 0.035, f"English = {100*lang['en']/len(reviews):.1f}% of all reviews",
+        transform=ax.transAxes, ha="center", fontsize=8.6, color="#111827")
+
+ax = fig.add_subplot(gs[0, 1])
+lat = reviews[~reviews.contains_non_latin_script]
+non = reviews[reviews.contains_non_latin_script]
+bins = np.linspace(0, reviews.review_length_chars.max(), 45)
+ax.hist(lat.review_length_chars, bins=bins, color=BLUE, alpha=0.60,
+        label=f"Latin script only (n={len(lat):,})", density=True)
+ax.hist(non.review_length_chars, bins=bins, color=ROSE, alpha=0.60,
+        label=f"Contains non-Latin (n={len(non):,})", density=True)
+ax.axvline(lat.review_length_chars.median(), color=BLUE, ls="--", lw=1.6)
+ax.axvline(non.review_length_chars.median(), color=ROSE, ls="--", lw=1.6)
+ax.legend(fontsize=8, loc="upper right")
+ax.set_yticks([])
+finish(ax, "Character length by script class",
+       "Review length (characters)", "Density")
+
+ax = fig.add_subplot(gs[0, 2])
+grp = reviews.groupby("contains_non_latin_script")[
+    ["review_length_chars", "review_word_count"]].mean()
+grp.index = ["Latin only", "Contains non-Latin"]
+x = np.arange(2)
+w = 0.36
+b1 = ax.bar(x - w/2, grp.review_length_chars, w, color=BLUE, alpha=0.85,
+            label="Characters")
+b2 = ax.bar(x + w/2, grp.review_word_count, w, color=AMBER, alpha=0.85,
+            label="Whitespace tokens")
+for b in list(b1) + list(b2):
+    ax.text(b.get_x() + b.get_width()/2, b.get_height() + 22,
+            f"{b.get_height():,.0f}", ha="center", fontsize=8.2, color=INK)
+ax.set_xticks(x)
+ax.set_xticklabels(grp.index, fontsize=8.6)
+ax.set_ylim(0, grp.values.max() * 1.34)
+ax.legend(fontsize=8.4, loc="upper center", bbox_to_anchor=(0.5, -0.085), ncol=2)
+finish(ax, "Characters vs word tokens", None, "Mean per review")
+r_chars = grp.review_length_chars.iloc[1] / grp.review_length_chars.iloc[0]
+r_words = grp.review_word_count.iloc[1] / grp.review_word_count.iloc[0]
+ax.text(0.50, 0.97,
+        f"non-Latin vs Latin:  {r_chars:.2f}x the characters, but only {r_words:.2f}x the tokens",
+        transform=ax.transAxes, va="top", ha="center", fontsize=8.6,
+        color="#111827", fontweight="bold",
+        bbox=dict(facecolor="#fef3c7", edgecolor="#d97706", linewidth=0.8,
+                  boxstyle="round,pad=0.35"))
+
+frame(fig, 6, "Does script class distort the review length measures?",
+      "one row per review; denominator = 7,000 reviews (6,697 Latin-only, 303 containing non-Latin letters)",
+      "product_reviews; script class from contains_non_latin_script, both measures derived from review_body_clean",
+      "Result: a measurement artefact, not a behavioural one. Non-Latin reviews average 0.62x the characters of Latin-only reviews but only "
+      "0.46x the whitespace tokens, because CJK and Japanese do not delimit words with spaces - word_count systematically under-counts them. "
+      "Note also that 745 reviews contain non-ASCII characters while only 303 are truly non-Latin: the 442 difference is European diacritics, "
+      "so an ASCII test would have mislabelled them.\n"
+      "Limitation: review_word_count is not comparable across scripts and should not be used for cross-language analysis without a "
+      "script-aware tokeniser. With only 303 non-Latin reviews spread across 13 language codes, per-language cells are too thin to test individually.")
+save(fig, 6, "multilingual_text_measures")
+
+# =============================================================================
+# FIGURE 7 - delivery / operational performance  (JOIN deliveries -> orders)
+# =============================================================================
+print("Figure 7 ...")
+before = len(deliveries)
+do = deliveries.merge(orders[["order_id", "nearest_warehouse", "sales_channel",
+                              "expedited_delivery", "order_total"]],
+                      on="order_id", how="left", validate="one_to_one")
+print(f"  grain check: deliveries {before:,} -> after join {len(do):,} "
+      f"(one_to_one on order_id; unchanged)")
+
+fig = plt.figure(figsize=(12.5, 7.6))
+gs = fig.add_gridspec(2, 3, height_ratios=[1.1, 1], hspace=0.55, wspace=0.30,
+                      left=0.070, right=0.985, top=0.855, bottom=0.190)
+
+ax = fig.add_subplot(gs[0, :2])
+piv = do.pivot_table(index="carrier", columns="service_level",
+                     values="on_time_in_full", aggfunc="mean") * 100
+cnt = do.pivot_table(index="carrier", columns="service_level",
+                     values="order_id", aggfunc="count")
+piv = piv.loc[piv.mean(axis=1).sort_values().index]
+x = np.arange(len(piv))
+w = 0.36
+for k, sl in enumerate(["Standard", "Express"]):
+    bars = ax.bar(x + (k - 0.5) * w, piv[sl], w, color=[BLUE, TEAL][k],
+                  alpha=0.85, label=f"{sl}")
+    for b, v, n in zip(bars, piv[sl], cnt.loc[piv.index, sl]):
+        ax.text(b.get_x() + b.get_width()/2, v + 0.6, f"{v:.1f}%",
+                ha="center", fontsize=8, color=INK)
+        ax.text(b.get_x() + b.get_width()/2, 4, f"{sl}  n={n:,}", ha="center",
+                va="bottom", fontsize=7.6, color="white", rotation=90)
+overall = do.on_time_in_full.mean() * 100
+ax.axhline(overall, color=ROSE, ls="--", lw=1.4)
+ax.set_xlim(-0.62, 3.85)
+ax.text(3.83, overall + 2.0, f"overall {overall:.1f}%",
+        fontsize=8, color=ROSE, ha="right")
+ax.set_xticks(x)
+ax.set_xticklabels(piv.index, fontsize=8.8)
+ax.set_ylim(0, 104)
+ax.yaxis.set_major_formatter(PercentFormatter())
+ax.yaxis.set_major_locator(MaxNLocator(5))
+finish(ax, "On-time-in-full rate by carrier and service level",
+       "Carrier", "OTIF rate")
+car = (do.groupby("carrier").on_time_in_full.mean() * 100).sort_values()
+
+ax = fig.add_subplot(gs[0, 2])
+dr = do.loc[do.delay_reason != "none", "delay_reason"].value_counts()
+ax.pie(dr.values, labels=[l.replace("_", "\n") for l in dr.index],
+       autopct=lambda p: f"{p:.0f}%", colors=[ROSE, AMBER, VIOLET],
+       startangle=90, textprops=dict(fontsize=8.2),
+       wedgeprops=dict(edgecolor="white", linewidth=1.6))
+ax.set_title(f"Delay reasons\n({dr.sum():,} late of {len(do):,} = "
+             f"{100*dr.sum()/len(do):.1f}%)",
+             fontsize=10, fontweight="bold", loc="center", pad=6)
+ax.grid(False)
+
+ax = fig.add_subplot(gs[1, 0])
+wh = do.groupby("nearest_warehouse").agg(
+    otif=("on_time_in_full", "mean"), dist=("shipping_distance_km", "mean"),
+    n=("order_id", "count"))
+ax.scatter(wh.dist, wh.otif * 100, s=wh.n / 4, color=TEAL, alpha=0.65,
+           edgecolors="white", linewidth=1.4)
+for name, row in wh.iterrows():
+    ax.annotate(f"{name}\n(n={int(row.n):,})", (row.dist, row.otif * 100),
+                fontsize=7.8, ha="center", xytext=(0, 13),
+                textcoords="offset points", color=INK)
+ax.set_xlim(wh.dist.min() - 0.28, wh.dist.max() + 0.28)
+ax.set_ylim(wh.otif.min() * 100 - 1.6, wh.otif.max() * 100 + 2.4)
+ax.yaxis.set_major_formatter(PercentFormatter())
+finish(ax, "Warehouse: distance vs OTIF", "Mean shipping distance (km)",
+       "OTIF rate")
+
+ax = fig.add_subplot(gs[1, 1])
+bins = [0, 2, 4, 6, 8, 12]
+do["dist_band"] = pd.cut(do.shipping_distance_km, bins=bins,
+                         labels=["0-2", "2-4", "4-6", "6-8", "8-12"])
+g = do.groupby("dist_band", observed=True).agg(
+    hrs=("fulfilment_hours", "mean"), n=("order_id", "count"))
+ax.bar(g.index.astype(str), g.hrs, color=VIOLET, alpha=0.85, width=0.62)
+for k, (v, n) in enumerate(zip(g.hrs, g.n)):
+    ax.text(k, v + 0.9, f"{v:.0f}h", ha="center", fontsize=8.2, color=INK)
+    ax.text(k, 2.5, f"n={n:,}", ha="center", fontsize=7.2, color="white",
+            rotation=90)
+ax.set_ylim(0, g.hrs.max() * 1.20)
+finish(ax, "Fulfilment time by distance", "Shipping distance band (km)",
+       "Mean fulfilment (hours)")
+
+ax = fig.add_subplot(gs[1, 2])
+exp = do.groupby("expedited_delivery").agg(
+    hrs=("fulfilment_hours", "mean"), otif=("on_time_in_full", "mean"),
+    n=("order_id", "count"))
+exp.index = ["Standard request", "Expedited"]
+x = np.arange(2)
+ax.bar(x, exp.hrs, 0.5, color=[SLATE, AMBER], alpha=0.85)
+for k, (v, n) in enumerate(zip(exp.hrs, exp.n)):
+    ax.text(k, v + 1.0, f"{v:.0f}h", ha="center", fontsize=8.5,
+            fontweight="bold")
+    ax.text(k, 2.5, f"n={int(n):,}", ha="center", fontsize=7.4, color="white")
+ax.set_xticks(x)
+ax.set_xticklabels(exp.index, fontsize=8.4)
+ax.set_ylim(0, exp.hrs.max() * 1.22)
+finish(ax, "Expedited flag vs fulfilment", None, "Mean fulfilment (hours)")
+
+frame(fig, 7, "Where does delivery performance actually vary?",
+      f"one row per completed order delivery; denominator = {len(do):,} deliveries ({int((~do.on_time_in_full).sum()):,} late, {100*(~do.on_time_in_full).mean():.1f}%)",
+      "deliveries \u22c8 orders on order_id (one-to-one; row count verified unchanged at 5,000)",
+      f"Result: OTIF is {overall:.1f}% overall and remarkably uniform - the carrier spread is only {car.max()-car.min():.1f} points "
+      f"({car.index[0]} {car.iloc[0]:.1f}% to {car.index[-1]} {car.iloc[-1]:.1f}%) and Express barely differs from Standard, so service "
+      f"level is not buying reliability. Delay causes split near-evenly across weather, carrier capacity and warehouse congestion "
+      f"({', '.join(f'{i.replace(chr(95),chr(32))} {100*v/dr.sum():.0f}%' for i, v in dr.items())}), meaning no single fixable bottleneck dominates.\n"
+      "Limitation: shipping distance spans only 0.5-10.1 km across three metropolitan warehouses, far too narrow a range to test a distance "
+      "effect on fulfilment time. Carrier is not randomly assigned, so any carrier gap may reflect route or product mix rather than performance.")
+save(fig, 7, "delivery_operational_performance")
+
+# =============================================================================
+# FIGURE 8 - does delivery performance shape reviews?  (JOIN reviews->deliveries)
+# =============================================================================
+print("Figure 8 ...")
+before = len(reviews)
+rd = reviews.merge(
+    deliveries[["order_id", "delay_days", "on_time_in_full", "service_level",
+                "carrier", "shipping_distance_km", "delay_reason"]],
+    on="order_id", how="left", validate="many_to_one")
+print(f"  grain check: product_reviews {before:,} -> after join {len(rd):,} "
+      f"(many_to_one on order_id; unchanged)")
+print(f"  note: {reviews.order_id.nunique():,} distinct orders carry the 7,000 reviews "
+      f"(mean {len(reviews)/reviews.order_id.nunique():.2f} reviews per reviewed order) - "
+      f"delivery attributes therefore repeat across sibling reviews and must NOT be "
+      f"aggregated as if one row per delivery")
+
+fig = plt.figure(figsize=(12.5, 7.8))
+gs = fig.add_gridspec(2, 3, height_ratios=[1, 1], hspace=0.52, wspace=0.30,
+                      left=0.070, right=0.985, top=0.855, bottom=0.230)
+
+ax = fig.add_subplot(gs[0, 0])
+g = rd.groupby("on_time_in_full").rating.agg(["mean", "sem", "count"])
+g.index = ["Late", "On time"]
+ax.bar(range(2), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.5,
+       color=[ROSE, TEAL], alpha=0.85, error_kw=dict(ecolor=SLATE, lw=1.2))
+for k, (v, n) in enumerate(zip(g["mean"], g["count"])):
+    ax.text(k, v + 0.16, f"{v:.2f}", ha="center", fontsize=8.8, fontweight="bold")
+    ax.text(k, 0.14, f"n={int(n):,}", ha="center", fontsize=7.6, color="white")
+ax.set_xticks(range(2))
+ax.set_xticklabels(g.index, fontsize=8.8)
+ax.set_ylim(0, 4.9)
+finish(ax, "Rating by OTIF outcome (95% CI)", None, "Mean star rating")
+
+ax = fig.add_subplot(gs[0, 1:])
+g = rd.groupby("delay_days").rating.agg(["mean", "sem", "count"])
+ax.errorbar(g.index, g["mean"], yerr=1.96 * g["sem"], fmt="o-", color=BLUE,
+            lw=1.8, ms=7, capsize=4, ecolor=SLATE)
+ax.axhline(reviews.rating.mean(), color=ROSE, ls="--", lw=1.3)
+ax.text(g.index.max(), reviews.rating.mean() + 0.03,
+        f"overall mean {reviews.rating.mean():.2f}", fontsize=8, color=ROSE,
+        ha="right", va="bottom")
+for x_, m, n in zip(g.index, g["mean"], g["count"]):
+    ax.text(x_, ax.get_ylim()[0], f"n={int(n):,}", ha="center", va="bottom",
+            fontsize=7.4, color=MUTED)
+ax.set_xticks(g.index)
+ax.set_ylim(3.2, 4.3)
+finish(ax, "Star rating does not decline as delivery lateness increases",
+       "Delay (days beyond promised date)", "Mean star rating (95% CI)")
+
+ax = fig.add_subplot(gs[1, 0])
+mix = pd.crosstab(rd.on_time_in_full, rd.rating, normalize="index") * 100
+mix.index = ["Late", "On time"]
+bottom = np.zeros(len(mix))
+star_cols = [ROSE, "#f43f5e", AMBER, "#5eead4", TEAL]
+for k, star in enumerate(sorted(mix.columns)):
+    ax.bar(mix.index, mix[star], 0.5, bottom=bottom, color=star_cols[k],
+           alpha=0.90, label=f"{star}\u2605")
+    for j, v in enumerate(mix[star]):
+        if v > 5:
+            ax.text(j, bottom[j] + v / 2, f"{v:.0f}%", ha="center", va="center",
+                    fontsize=7.6, color="white", fontweight="bold")
+    bottom += mix[star].values
+ax.set_ylim(0, 100)
+ax.yaxis.set_major_formatter(PercentFormatter())
+ax.legend(fontsize=7.6, ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.075),
+          columnspacing=0.8, handlelength=1.1, handletextpad=0.35,
+          title="Star rating", title_fontsize=7.6)
+finish(ax, "Rating mix is unchanged by lateness", None, "Share of reviews")
+ax.tick_params(labelsize=8.6)
+
+ax = fig.add_subplot(gs[1, 1])
+g = rd.groupby("service_level").rating.agg(["mean", "sem", "count"])
+ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.5,
+       color=[TEAL, BLUE], alpha=0.85, error_kw=dict(ecolor=SLATE, lw=1.2))
+ax.set_xticks(range(len(g)))
+ax.set_xticklabels([f"{i}\n(n={int(n):,})" for i, n in zip(g.index, g["count"])],
+                   fontsize=8.4)
+for k, v in enumerate(g["mean"]):
+    ax.text(k, v + 0.14, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
+ax.set_ylim(0, 4.9)
+finish(ax, "Rating by service level", None, "Mean star rating")
+
+ax = fig.add_subplot(gs[1, 2])
+g = rd.groupby("delay_reason").rating.agg(["mean", "sem", "count"]).sort_values("mean")
+lbl = {"none": "no delay", "carrier_capacity": "carrier\ncapacity",
+       "warehouse_congestion": "warehouse\ncongestion", "weather": "weather"}
+ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=4, width=0.6,
+       color=[SEQ[i] for i in range(len(g))], alpha=0.85,
+       error_kw=dict(ecolor=SLATE, lw=1.1))
+ax.set_xticks(range(len(g)))
+ax.set_xticklabels([lbl.get(i, i) for i in g.index], fontsize=8)
+for k, (v, n) in enumerate(zip(g["mean"], g["count"])):
+    ax.text(k, v + 0.14, f"{v:.2f}", ha="center", fontsize=8.2, fontweight="bold")
+    ax.text(k, 0.14, f"n={int(n):,}", ha="center", fontsize=7.2, color="white")
+ax.set_ylim(0, 4.9)
+finish(ax, "Rating by delay reason", None, "Mean star rating")
+
+frame(fig, 8, "Does delivery performance shape customer ratings?",
+      "one row per review; denominator = 7,000 reviews covering 4,044 distinct orders",
+      "product_reviews \u22c8 deliveries on order_id (many-to-one; rows unchanged at 7,000)",
+      f"Result: a clean null across every operational cut. Late deliveries score {rd[~rd.on_time_in_full].rating.mean():.2f} vs "
+      f"{rd[rd.on_time_in_full].rating.mean():.2f} for on-time, the rating mix is visually identical, ratings are flat from 0 to 5 days late "
+      f"with overlapping confidence intervals, and service level and delay reason make no difference. Yet stated delivery_experience matches "
+      f"the recorded OTIF flag on {100*((rd.delivery_experience=='delayed')==(~rd.on_time_in_full)).mean():.1f}% of reviews, so the operational "
+      f"data is reported faithfully - it simply does not transfer to the star rating.\n"
+      "Limitation: reviews are many-to-one onto deliveries (1.73 reviews per reviewed order), so delivery attributes repeat across sibling "
+      "reviews and rows are not independent - the confidence intervals above are therefore optimistic. Only 4,044 of 5,000 orders were "
+      "reviewed, and non-reviewers may be exactly the dissatisfied group, which is a survivorship risk this data cannot resolve.")
+save(fig, 8, "delivery_impact_on_reviews")
 
 figure_register = pd.DataFrame([
-    (1, 'Order-value distribution', 'univariate distribution', 'orders', 'order', 'none'),
-    (2, 'Discount and gross basket', 'bivariate group comparison', 'orders', 'order', 'none'),
-    (3, 'Category contribution and rate', 'multivariate / product economics', 'order_items + products', 'order item', 'product_id many-to-one'),
-    (4, 'Monthly frequency and value', 'temporal pattern', 'orders', 'month', 'none'),
-    (5, 'Prior and current frequency', 'customer behaviour', 'orders + customers', 'customer', 'customer_id one-to-one after aggregation'),
-    (6, 'OTIF and fulfilment by service', 'delivery operations / segmented', 'deliveries', 'delivery', 'relationship checked in solution'),
-    (7, 'Delivery timing, review lag and rating', 'review behaviour + delivery operations', 'product_reviews + deliveries', 'rated order', 'order_id one-to-one after review aggregation'),
-], columns=['figure', 'question_short', 'category', 'tables', 'analysis_unit', 'join'])
+    [1, "Univariate distribution/composition", "orders", "none", "order"],
+    [2, "Bivariate and customer comparison", "orders; customers", "customer_id", "order / customer"],
+    [3, "Multivariate category analysis", "order_items; products", "product_id", "order-item line"],
+    [4, "Temporal pattern", "orders", "none", "order aggregated by time"],
+    [5, "Review/text behaviour", "product_reviews", "none", "review"],
+    [6, "Review/text behaviour", "product_reviews", "none", "review"],
+    [7, "Delivery/operational performance", "deliveries; orders", "order_id", "delivery"],
+    [8, "Delivery-review relationship", "product_reviews; deliveries", "order_id", "review"],
+], columns=["figure", "category", "tables", "join_key", "grain"])
+assert len(figure_register) == 8
+assert figure_register.tables.str.contains("orders|order_items|customers|deliveries|products|product_reviews").all()
 figure_register
-
-ml_link_register = pd.DataFrame([
-    ('OTIF-failure classification', 'Figure 6', 'carrier–service OTIF differs, with uncertainty'),
-    ('Fulfilment-hours regression', 'Figure 6', 'fulfilment time has a broad overlapping distribution that may need order-level predictors'),
-    ('Low-rating classification', 'Figure 7', 'simple delivery timing means do not separate low-rating risk'),
-    ('Future customer-frequency regression', 'Figure 5', 'prior frequency alone has weak current-period association'),
-    ('Product clustering', 'Figure 3', 'categories differ in contribution scale and estimated rate'),
-], columns=['candidate_question', 'EDA_evidence', 'reason_for_next_step'])
-ml_link_register

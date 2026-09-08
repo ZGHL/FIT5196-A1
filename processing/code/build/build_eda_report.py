@@ -54,7 +54,7 @@ def paragraphs(text: str) -> str:
 
 
 def figure_contract(text: str, number: int) -> tuple[str, str]:
-    pattern = rf"## Figure {number} — (.+?)\n\n(.+?)(?=\n\n## Figure {number + 1} —|\n\n## 4\.)"
+    pattern = rf"## Figure {number} — (.+?)\n\n(.+?)(?=\n\n## Figure \d+ —|\n\n## 4\.)"
     match = re.search(pattern, text, flags=re.S)
     if not match:
         raise ValueError(f"Figure {number} section not found")
@@ -69,23 +69,22 @@ def figure_contract(text: str, number: int) -> tuple[str, str]:
 def figure_block(text: str, number: int, css_class: str = "") -> str:
     title, body = figure_contract(text, number)
     image_uri = (FIGURES / f"Figure_{number}.png").resolve().as_uri()
-    rationales = {
-        1: "Following the distribution-first approach described by NIST/SEMATECH (n.d.), a histogram retains the shape of the full order-value distribution. The median and empirical 90th percentile were added because the right-skewed distribution makes the mean alone a poor description of a typical order.",
-        2: "Boxplots compare the median, middle 50% and overall spread without displaying thousands of overlapping points. A separate enlarged panel reports group means and 95% confidence intervals so uncertainty remains visible even though the full distributions are wide.",
-        3: "The two aligned panels use a common category order. Horizontal bars show total estimated contribution, while points show margin rate; separating these measures prevents a high-volume category from being mistaken for a high-rate category.",
-        4: "Orders are aggregated by calendar month and divided by the number of days in that month. The coordinated panels then compare transaction frequency with mean order value without treating a longer month as stronger demand.",
-        5: "Both variables are integer customer counts, so a conventional scatter plot would hide repeated observations. Hexagonal bins show how many customers occupy each region, and the fitted line is included only as a summary of the weak linear association.",
-        6: "OTIF is a binary proportion, so point estimates are shown with Wilson 95% intervals. Fulfilment hours are shown as boxplots because their within-group distributions overlap and cannot be represented adequately by one mean.",
-        7: "The delivery- and review-timing comparison was motivated by Ravula (2023). Reviews are first averaged within order, preventing orders with several reviews from receiving extra weight. Point estimates and 95% intervals compare groups; the enlarged vertical scale is labelled explicitly because all means occupy a narrow part of the original 1–5 scale.",
-    }
     return f"""
     <article class="figure-block {css_class}">
       <h3>2.{number} {inline(title)}</h3>
-      <p class="rationale"><strong>Method and rationale.</strong> {rationales[number]}</p>
       <img src="{image_uri}" alt="Figure {number}">
       <div class="figure-note">{paragraphs(body)}</div>
     </article>
     """
+
+
+def figure_pair(text: str, first: int) -> str:
+    return (
+        '<section class="figure-pair">'
+        + figure_block(text, first)
+        + figure_block(text, first + 1)
+        + '</section>'
+    )
 
 
 def supporting_table(number: int) -> str:
@@ -142,21 +141,18 @@ def finding_list(items: list[str], start: int) -> str:
 
 
 def ml_cards(rows: list[list[str]], start: int) -> str:
-    names = [
-        "OTIF-failure classification",
-        "Fulfilment-hours regression",
-        "Low-rating classification",
-        "Future customer-frequency regression",
-        "Product clustering",
-    ]
+    names = ["OTIF-failure classification", "Fulfilment-hours regression",
+             "Low-rating classification", "Future customer-frequency regression",
+             "Product clustering"]
     sections = []
     for offset, row in enumerate(rows):
         number = start + offset
         sections.append(
             f'<section class="ml-question"><h3>4.{number} {names[number - 1]}</h3>'
-            f'<p>{inline(row[1])}</p>'
-            f'<p><strong>Analysis design.</strong> {inline(row[2])} Candidate predictors are {inline(row[3])}</p>'
-            f'<p><strong>Evaluation and risk.</strong> {inline(row[4])} {inline(row[5])}</p></section>'
+            f'<p><strong>Use case, unit and target.</strong> {inline(row[1])}</p>'
+            f'<p><strong>Decision-time predictors.</strong> {inline(row[2])}</p>'
+            f'<p><strong>Validation and metrics.</strong> {inline(row[3])}</p>'
+            f'<p><strong>Risk and EDA grounding.</strong> {inline(row[4])}</p></section>'
         )
     return "".join(sections)
 
@@ -208,25 +204,28 @@ def build_html() -> str:
     .supporting-table p { margin-bottom: 1mm; }
     .supporting-table .table-summary { margin: 0; }
     .supporting-table .table-summary th, .supporting-table .table-summary td { padding: 1mm 1.8mm; }
-    .figure-block { margin-bottom: 5mm; }
+    .figure-pair { break-after: page; }
+    .figure-pair:last-of-type { break-after: auto; }
+    .figure-block { margin-bottom: 4mm; break-inside: avoid; }
     .figure-block h3 { break-after: avoid; }
     .figure-block .rationale { break-after: avoid; }
-    .figure-block img { display: block; width: 100%; max-height: 105mm; object-fit: contain; margin: 1mm auto 2mm; break-inside: avoid; }
+    .figure-block img { display: block; width: 100%; max-height: 72mm; object-fit: contain; margin: 1mm auto 1.5mm; break-inside: avoid; }
     .figure-block.large img { max-height: 150mm; }
     .figure-block.medium img { max-height: 94mm; }
     .figure-block.compact { margin-bottom: 3mm; }
     .figure-block.compact img { max-height: 62mm; }
     .figure-block.compact .figure-note { font-size: 8pt; line-height: 1.25; }
     .figure-block.compact .figure-note p { margin-bottom: 1.5mm; }
-    .figure-note { font-size: 8.6pt; }
+    .figure-note { font-size: 7.7pt; line-height: 1.24; }
+    .figure-note p { margin-bottom: 1.2mm; }
     .rationale { font-size: 8.7pt; margin-bottom: 1.5mm; }
-    .finding { display: grid; grid-template-columns: 7mm auto; gap: 2mm; margin-bottom: 2.6mm; break-inside: avoid; }
+    .finding { display: grid; grid-template-columns: 7mm auto; gap: 2mm; margin-bottom: 1.8mm; break-inside: avoid; font-size: 8.25pt; line-height: 1.25; }
     .finding > span { font-weight: bold; }
     .finding p { margin: 0; }
     .chapter-transition { margin-top: 6mm; break-inside: avoid; }
     .chapter-transition h2 { margin-top: 0; }
-    .ml-question { break-inside: avoid; margin-bottom: 4mm; }
-    .ml-question p { font-size: 9pt; margin-bottom: 1.4mm; }
+    .ml-question { break-inside: avoid; margin-bottom: 2.4mm; }
+    .ml-question p { font-size: 8.2pt; line-height: 1.22; margin-bottom: 0.8mm; }
     .conclusion { margin-top: 4mm; }
     .references { font-size: 10pt; }
     .references-section { break-before: page; }
@@ -248,11 +247,11 @@ def build_html() -> str:
       <table class="table-summary coverage"><thead><tr><th>Table</th><th>Rows</th><th>Columns</th><th>Role in the EDA</th></tr></thead><tbody><tr><td>orders</td><td>5,000</td><td>23</td><td>Order value, discount and time</td></tr><tr><td>order_items</td><td>15,723</td><td>6</td><td>Product-level sales contribution</td></tr><tr><td>customers</td><td>500</td><td>20</td><td>Prior customer activity</td></tr><tr><td>deliveries</td><td>5,000</td><td>20</td><td>OTIF and fulfilment</td></tr><tr><td>products</td><td>1,000</td><td>21</td><td>Category and catalogue cost</td></tr><tr><td>product_reviews</td><td>7,000</td><td>21</td><td>Rating and review timing</td></tr></tbody></table>
       <h2>1.2 Check the data before analysis</h2><p>Before choosing the figures, we rechecked that the row count of each table matched its primary-key count. All six checks passed. For relational figures, the parent key was required to be unique and the left-hand row count had to remain unchanged. Orders were aggregated before the customer analysis, and multiple reviews were averaged within order before the delivery join. These checks protect the observation unit used in each chart.</p>
       <p>The solution notebook provides the complete transformation and validation record. For this EDA, the most relevant results are zero orphan keys across the submitted relationships, a $0.00 maximum arithmetic difference, consistent delivery and OTIF fields, and preservation of the 303 reviews containing non-Latin script.</p>
-      <h2>1.3 Move from table structure to analytical questions</h2><p>We first examined the distribution of order value, then compared discounts, product categories and months. We next moved to customer behaviour, operational performance and the relationship between delivery timing and reviews. This sequence progresses from single-table description to checked relational analysis.</p>
+      <h2>1.3 Move from table structure to analytical questions</h2><p>We first examined order-value distribution and composition, then customer groups, product categories and time. We next tested review behaviour, multilingual text measurement, delivery operations and the delivery-review relationship. This sequence progresses from single-table description to checked relational analysis.</p>
       <p>Continuous group means are reported with 95% confidence intervals, and OTIF proportions use Wilson 95% intervals. The figures describe associations in this export and are not interpreted as causal effects.</p>
-      <h2>1.4 Assessed EDA coverage</h2><table class="table-summary coverage"><thead><tr><th>Requirement</th><th>Evidence</th><th>Observation unit</th></tr></thead><tbody><tr><td>Univariate distribution</td><td>Figure 1</td><td>Order</td></tr><tr><td>Bivariate comparison</td><td>Figure 2</td><td>Order within discount group</td></tr><tr><td>Multivariate analysis</td><td>Figure 3</td><td>Order-item line</td></tr><tr><td>Temporal pattern</td><td>Figure 4</td><td>Calendar month</td></tr><tr><td>Review behaviour</td><td>Figure 7</td><td>Rated order</td></tr><tr><td>Delivery performance</td><td>Figure 6</td><td>Delivery</td></tr><tr><td>Checked relational analysis</td><td>Figures 3, 5 and 7</td><td>Item, customer and rated order</td></tr></tbody></table>
+      <h2>1.4 Assessed EDA coverage</h2><table class="table-summary coverage"><thead><tr><th>Requirement</th><th>Evidence</th><th>Observation unit</th></tr></thead><tbody><tr><td>Univariate distribution/composition</td><td>Figure 1</td><td>Order</td></tr><tr><td>Bivariate comparison</td><td>Figures 2 and 5</td><td>Order, customer or review</td></tr><tr><td>Multivariate/segmented analysis</td><td>Figures 3, 7 and 8</td><td>Item, delivery or review</td></tr><tr><td>Temporal pattern</td><td>Figure 4</td><td>Order aggregated by time</td></tr><tr><td>Review/text behaviour</td><td>Figures 5, 6 and 8</td><td>Review</td></tr><tr><td>Delivery/operational performance</td><td>Figures 7 and 8</td><td>Delivery or review</td></tr><tr><td>Checked relational analysis</td><td>Figures 2, 3, 7 and 8</td><td>Order, item, delivery and review</td></tr></tbody></table>
       <h1 class="section-title">2. Assessed visualisations</h1>
-      {figure_block(text, 1, 'compact')}{figure_block(text, 2, 'compact')}{supporting_table(2)}{figure_block(text, 3, 'compact')}{figure_block(text, 4, 'compact')}{supporting_table(4)}{figure_block(text, 5, 'compact')}{figure_block(text, 6, 'compact')}{supporting_table(6)}{figure_block(text, 7, 'medium')}{supporting_table(7)}
+      {figure_pair(text, 1)}{figure_pair(text, 3)}{figure_pair(text, 5)}{figure_pair(text, 7)}
       <h1 class="section-title">3. Evidence-based findings</h1>{finding_list(finding_items, 1)}
       <div class="chapter-transition"><h1 class="section-title">4. Future machine-learning questions</h1><p>No model is trained in this assignment. Each question is grounded in an EDA result and uses predictors available at the proposed decision time.</p></div>
       {ml_cards(questions, 1)}

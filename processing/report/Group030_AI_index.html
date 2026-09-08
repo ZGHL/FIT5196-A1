@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Group030 AI Records Index</title><style>
+    @page { size: A4; margin: 17mm 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; line-height: 1.35; }
+    .page { min-height: 264mm; break-after: page; position: relative; }
+    .page:last-child { break-after: auto; }
+    h1 { margin: 0 0 2mm; font-size: 20pt; }
+    .course { margin: 0 0 6mm; font-size: 10pt; }
+    .note { margin: 0 0 6mm; padding: 3mm 4mm; border: 0.5pt solid #777; }
+    .record { break-inside: avoid; margin: 0 0 7mm; }
+    h2 { margin: 0 0 2mm; font-size: 12pt; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-top: 0.5pt solid #888; padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+    th { width: 39mm; font-weight: bold; }
+    tr:last-child th, tr:last-child td { border-bottom: 0.5pt solid #888; }
+    code { font-family: "Courier New", monospace; font-size: 8.7pt; }
+    footer { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 8.5pt; }
+    </style></head><body><section class="page"><h1>Group030 AI Records Index</h1>
+    <p class="course">FIT5196 Data Wrangling · Assessment 1 · Semester 2, 2026</p>
+    <p class="note">This English index identifies each supplied conversational-AI record, its purpose, the affected submission work and the independent checks applied by the group. It does not replace the complete conversation files in <code>AI_records/</code>. Each member must confirm that their listed file is complete before signing the separate AI-use declaration.</p><article class="record"><h2>AI-01 — Xinhang Ren (35134410)</h2><table>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Complete export filename</th><td><code>AI-01.pdf</code></td></tr>
+    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Purpose</th><td>Assignment planning, interpretation of the specification and rubric, and quality-control guidance for the solution, mapping, text functions, EDA and report.</td></tr>
+    <tr><th>Affected submission work</th><td>Group030_solution.ipynb; Group030_source_to_target_mapping.csv; Group030_text_functions.py; Group030_EDA.ipynb; Group030_EDA.pdf; validation register; submission checklist.</td></tr>
+    <tr><th>Independent verification</th><td>Requirements were checked against the official specification and rubric. The final workflow passed 18/18 public text tests, 8/8 student-designed tests and 64/64 validation checks. Both notebooks were rerun in a clean offline marking-style workspace.</td></tr>
+    </table></article><article class="record"><h2>AI-02 — Sizhe Hong (35381949)</h2><table>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Complete export filename</th><td><code>AI-02.pdf</code></td></tr>
+    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Purpose</th><td>Development of the validation framework for schema, types, missing values, keys, source row flow, overlap, arithmetic, temporal consistency and text processing.</td></tr>
+    <tr><th>Affected submission work</th><td>Validation and quality-control sections of Group030_solution.ipynb and the validation evidence referred to in the EDA report.</td></tr>
+    <tr><th>Independent verification</th><td>Recommendations were checked against the public data dictionary, source reconciliation counts and executable VAL-* register. The final register contains 64/64 PASS results and reports observed values rather than relying only on hard-coded expected counts.</td></tr>
+    </table></article><footer>1</footer></section><section class="page"><article class="record"><h2>AI-03 — Yinglin Fang (34814248)</h2><table>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Complete export filename</th><td><code>AI-03.pdf</code></td></tr>
+    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Purpose</th><td>Review of the six-table relational design, observation grain, primary and foreign keys, field allocation, cleaning and JSON/XML reconciliation logic.</td></tr>
+    <tr><th>Affected submission work</th><td>Relational transformations in Group030_solution.ipynb; field lineage in Group030_source_to_target_mapping.csv; schema, key, arithmetic and temporal validation.</td></tr>
+    <tr><th>Independent verification</th><td>The design was checked against the public data dictionary. Executable PK/FK assertions, arithmetic reconciliation and temporal checks passed, and a clean rerun recreated all six standardised tables exactly.</td></tr>
+    </table></article><article class="record"><h2>AI-04 — Guohou Zhang (35800275)</h2><table>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Complete export filename</th><td><code>AI-04.pdf</code></td></tr>
+    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Purpose</th><td>Review of bounded regular expressions, Unicode normalisation, multilingual preservation, narrative cleaning and related validation.</td></tr>
+    <tr><th>Affected submission work</th><td>Group030_text_functions.py; text-processing sections of Group030_solution.ipynb; related validation-register entries.</td></tr>
+    <tr><th>Independent verification</th><td>The implementation was checked against the published text contract, 18/18 public cases and 8/8 student-designed edge cases. Multilingual checks confirm that 303 reviews containing non-Latin script remain identified after cleaning.</td></tr>
+    </table></article><article class="record"><h2>AI-05 — King Man Chan (36550779)</h2><table>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Complete export filename</th><td><code>AI-05.pdf</code></td></tr>
+    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Purpose</th><td>Design of additional tests for narrative cleaning, order and product reference extraction, promotion extraction and Unicode helper functions.</td></tr>
+    <tr><th>Affected submission work</th><td>Student-designed test section of Group030_solution.ipynb and quality-control evidence for Group030_text_functions.py.</td></tr>
+    <tr><th>Independent verification</th><td>The additional cases were executed through the same expected-versus-actual test harness as the public suite. The final notebook reports 18/18 public cases and 8/8 student-designed cases passing.</td></tr>
+    </table></article><footer>2</footer></section></body></html>
