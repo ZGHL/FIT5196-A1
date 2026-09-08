@@ -566,9 +566,9 @@ ax.legend(fontsize=8.4, loc="upper center", bbox_to_anchor=(0.5, -0.085), ncol=2
 finish(ax, "Characters vs word tokens", None, "Mean per review")
 r_chars = grp.review_length_chars.iloc[1] / grp.review_length_chars.iloc[0]
 r_words = grp.review_word_count.iloc[1] / grp.review_word_count.iloc[0]
-ax.text(0.50, 0.97,
-        f"non-Latin vs Latin:  {r_chars:.2f}x the characters, but only {r_words:.2f}x the tokens",
-        transform=ax.transAxes, va="top", ha="center", fontsize=8.6,
+ax.text(0.50, 0.96,
+        f"Relative to Latin-only reviews\nCharacters: {r_chars:.2f}×   Whitespace tokens: {r_words:.2f}×",
+        transform=ax.transAxes, va="top", ha="center", fontsize=7.6,
         color="#111827", fontweight="bold",
         bbox=dict(facecolor="#fef3c7", edgecolor="#d97706", linewidth=0.8,
                   boxstyle="round,pad=0.35"))

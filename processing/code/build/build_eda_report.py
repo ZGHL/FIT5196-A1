@@ -60,10 +60,7 @@ def figure_contract(text: str, number: int) -> tuple[str, str]:
         raise ValueError(f"Figure {number} section not found")
     title = match.group(1).strip()
     body = match.group(2).strip()
-    parts = re.split(r"\n\n", body)
-    contract = parts[0]
-    interpretation = parts[-1]
-    return title, contract + "\n\n" + interpretation
+    return title, body
 
 
 def figure_block(text: str, number: int, css_class: str = "") -> str:
