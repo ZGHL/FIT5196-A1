@@ -10,6 +10,7 @@ members={
     f"{G}_text_functions.py":R/"processing"/"code"/f"{G}_text_functions.py",
     f"{G}_source_to_target_mapping.csv":R/"processing"/"mapping"/f"{G}_source_to_target_mapping.csv",
     f"{G}_AI_declaration.pdf":R/f"{G}_AI_declaration.pdf",
+    "templates/A1_public_text_test_cases.csv":R/"assignment_materials"/"templates"/"A1_public_text_test_cases.csv",
 }
 for name in ["orders","order_items","customers","deliveries","products","product_reviews"]:
     members[f"outputs/{G}_{name}_standardised.csv"]=R/"processing"/"outputs"/f"{G}_{name}_standardised.csv"

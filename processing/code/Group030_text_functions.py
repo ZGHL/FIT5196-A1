@@ -22,7 +22,8 @@ _MARKER_RE = re.compile(
     re.I,
 )
 _REFERENCE_WRAPPER_RE = re.compile(
-    r"Reference:\s*(?:HORD|CORD)\d{6}\s*\|\s*SKU:\s*SKU-[A-Za-z0-9]+",
+    r"Reference:\s*(?:HORD|CORD)\d{6}(?![A-Za-z0-9_-])"
+    r"(?:\s*[|;/]\s*|\s+)SKU:\s*SKU-[A-Za-z0-9]+(?![A-Za-z0-9_-])",
     re.I,
 )
 _PROMO_WRAPPER_RE = re.compile(r"PROMO:\s*B[1-5]SAVE-\d{2}", re.I)
@@ -44,6 +45,7 @@ def _is_emoji(char: str) -> bool:
     return (
         0x1F000 <= cp <= 0x1FAFF
         or 0x2600 <= cp <= 0x27BF
+        or cp in {0x2B50, 0x2B55}
         or 0xFE00 <= cp <= 0xFE0F
         or 0x1F1E6 <= cp <= 0x1F1FF
         or 0xE0020 <= cp <= 0xE007F

@@ -3,8 +3,8 @@
 - [x] Group identifier is consistently `Group030`.
 - [x] Six output CSVs match the dictionary field names/order.
 - [x] Solution and EDA notebooks pass a fresh offline run.
-- [x] Text public cases pass 18/18; eight additional near-match/Unicode cases pass.
-- [x] Validation register reports 66/66 PASS and includes an explicit `check` field.
+- [x] Text public cases pass 18/18; student-designed edge cases pass 22/22.
+- [x] Validation register reports 68/68 PASS and includes an explicit `check` field.
 - [x] Mapping has all 111 required rows and no blank core evidence fields.
 - [x] EDA PDF has 8 assessed figures, exactly 10 findings and exactly 5 ML questions in 9 pages.
 - [x] Raw JSON/XML files are excluded from Git and must be excluded from the Moodle ZIP.

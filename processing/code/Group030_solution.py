@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from Group030_text_functions import (
-    MISSING, build_latin_analysis, clean_delivery_note, clean_narrative_text,
+    MISSING, _remove_emoji, build_latin_analysis, clean_delivery_note, clean_narrative_text,
     contains_non_latin_script, extract_order_reference,
     extract_product_sku, extract_promo_code,
 )
@@ -315,6 +315,10 @@ def validate(tables, dictionary, profile):
     delivery_notes=tables["deliveries"].delivery_note_clean
     uppercase_delivery_notes=delivery_notes.map(lambda value:value!=MISSING and any(char.isupper() for char in value)).sum()
     add("VAL-TEXT-10","Delivery notes retain source letter case instead of being forced to lower-case",uppercase_delivery_notes>0,f"delivery notes retaining upper-case letters={uppercase_delivery_notes}","Observed upper-case letters provide evidence that the delivery-specific cleaner preserves source case")
+    wrapper_residue=refs.review_body_clean.str.contains(r"(?i)\breference\s*:|\bsku\s*:",regex=True).sum()+refs.review_body_latin_analysis.str.contains(r"(?i)\breference\s*:|\bsku\s*:",regex=True).sum()
+    add("VAL-TEXT-11","Published review reference wrappers are absent from both cleaned review fields",wrapper_residue==0,f"wrapper residues={wrapper_residue}")
+    emoji_residue=sum(_remove_emoji(value)!=value for field in ["review_body_clean","review_body_latin_analysis"] for value in refs[field])
+    add("VAL-TEXT-12","No supported removable emoji remain in either cleaned review field",emoji_residue==0,f"emoji residues={emoji_residue}")
     return pd.DataFrame(rows)
 
 PROJECT_ROOT = Path.cwd()

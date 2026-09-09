@@ -9,4 +9,4 @@ This assignment used conversational AI. Before creating the final Moodle ZIP:
 
 The six registered conversation files are `AI-01.pdf` through `AI-05.pdf` and `AI-06.html`. Each member must confirm that the records attributed to them are complete, unshortened exports of their assignment-related conversations.
 
-Independent checks available for the index include: `TXT-01`–`TXT-18` public cases (18/18 PASS), student-designed tests (14/14 PASS), the `VAL-*` register (66/66 PASS), join-cardinality assertions, and a clean-directory Restart & Run All of both self-contained notebooks.
+Independent checks available for the index include: `TXT-01`–`TXT-18` public cases (18/18 PASS), student-designed tests (22/22 PASS), the `VAL-*` register (68/68 PASS), join-cardinality assertions, and a clean-directory Restart & Run All of both self-contained notebooks.
