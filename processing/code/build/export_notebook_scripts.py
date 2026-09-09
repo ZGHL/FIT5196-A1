@@ -52,7 +52,7 @@ from pathlib import Path
 import pandas as pd
 
 from Group030_text_functions import (
-    MISSING, build_latin_analysis, clean_narrative_text,
+    MISSING, build_latin_analysis, clean_delivery_note, clean_narrative_text,
     contains_non_latin_script, extract_order_reference,
     extract_product_sku, extract_promo_code,
 )

@@ -63,3 +63,5 @@ VAL-TEXT-05,Review character counts derive from cleaned multilingual text,PASS,m
 VAL-TEXT-06,Review word counts derive from cleaned multilingual text,PASS,mismatches=0,None required
 VAL-TEXT-07,Latin analysis is derived from cleaned multilingual review text,PASS,mismatches=0,None required
 VAL-TEXT-08,Non-Latin indicator is derived from cleaned multilingual review text,PASS,mismatches=0,None required
+VAL-TEXT-09,The three designated cleaned narratives are lower-case,PASS,non-lower-case values=0,None required
+VAL-TEXT-10,Delivery notes retain source letter case instead of being forced to lower-case,PASS,delivery notes retaining upper-case letters=5000,Observed upper-case letters provide evidence that the delivery-specific cleaner preserves source case

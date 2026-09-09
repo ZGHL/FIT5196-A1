@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from Group030_text_functions import (
-    MISSING, build_latin_analysis, clean_narrative_text,
+    MISSING, build_latin_analysis, clean_delivery_note, clean_narrative_text,
     contains_non_latin_script, extract_order_reference,
     extract_product_sku, extract_promo_code,
 )
@@ -95,7 +95,7 @@ def normalise_delivery(d, source):
       "shipping_distance_km": float(get("shippingDistanceKm", "Shipping_Distance_Km")),
       "signature_required": boolean(get("signatureRequired", "Signature_Required")),
       "estimated_carbon_kg": float(get("estimatedCarbonKg", "Estimated_Carbon_Kg")),
-      "delivery_note_clean": clean_narrative_text(get("deliveryNoteClean", "Delivery_Note_Clean"))}
+      "delivery_note_clean": clean_delivery_note(get("deliveryNoteClean", "Delivery_Note_Clean"))}
 
 def normalise_review(r, source):
     get = (lambda a, b: r[a]) if source == "json" else (lambda a, b: r.findtext(b))
@@ -309,6 +309,12 @@ def validate(tables, dictionary, profile):
     nonlatin_expected=refs.review_body_clean.map(contains_non_latin_script)
     add("VAL-TEXT-07","Latin analysis is derived from cleaned multilingual review text",latin_expected.eq(refs.review_body_latin_analysis).all(),f"mismatches={(latin_expected!=refs.review_body_latin_analysis).sum()}")
     add("VAL-TEXT-08","Non-Latin indicator is derived from cleaned multilingual review text",nonlatin_expected.eq(refs.contains_non_latin_script).all(),f"mismatches={(nonlatin_expected!=refs.contains_non_latin_script).sum()}")
+    lowercase_fields=[("orders","customer_note_clean"),("products","product_description_clean"),("product_reviews","review_body_clean")]
+    lowercase_failures=sum((tables[t][f]!=MISSING).mul(tables[t][f].ne(tables[t][f].str.lower())).sum() for t,f in lowercase_fields)
+    add("VAL-TEXT-09","The three designated cleaned narratives are lower-case",lowercase_failures==0,f"non-lower-case values={lowercase_failures}")
+    delivery_notes=tables["deliveries"].delivery_note_clean
+    uppercase_delivery_notes=delivery_notes.map(lambda value:value!=MISSING and any(char.isupper() for char in value)).sum()
+    add("VAL-TEXT-10","Delivery notes retain source letter case instead of being forced to lower-case",uppercase_delivery_notes>0,f"delivery notes retaining upper-case letters={uppercase_delivery_notes}","Observed upper-case letters provide evidence that the delivery-specific cleaner preserves source case")
     return pd.DataFrame(rows)
 
 PROJECT_ROOT = Path.cwd()

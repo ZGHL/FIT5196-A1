@@ -20,7 +20,8 @@ FIT5196-A1/
 │   ├── figures/                # EDA 生成的 Figure 1–8
 │   ├── report/                 # PDF 生成过程中使用的 HTML 报告
 │   └── assets/                 # 报告使用的校徽等静态资源
-├── AI_records/                 # AI 对话记录、AI index 和待签署声明工作文件
+├── AI_records/                 # AI 对话原语言导出和英文 AI index
+├── Group030_AI_declaration.pdf # 五位组员已签署的正式 AI 使用声明
 ├── Group030_EDA.pdf            # 最终提交的 EDA 报告
 ├── Group030_A1_submission.zip  # 最终 Moodle 提交压缩包（最后检查后生成）
 ├── SUBMISSION_CHECKLIST.md     # 提交前检查清单
@@ -63,6 +64,6 @@ python3 processing/code/build/build_final_submission.py
 
 - 所有组员已经检查自己的姓名和学号；
 - 所有组员已经签署 `Group030_AI_declaration.pdf`；
-- 真实、完整的 AI 对话记录和英文 AI index 已放在 `AI_records/`；
+- 真实、完整的原语言 AI 对话记录和英文 AI index 已放在 `AI_records/`；
 - 两份 Notebook 已完成 Restart & Run All；
 - 六张 CSV、八张图和最终 PDF 均由当前版本代码重新生成。

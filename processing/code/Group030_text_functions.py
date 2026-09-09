@@ -26,6 +26,10 @@ _REFERENCE_WRAPPER_RE = re.compile(
     re.I,
 )
 _PROMO_WRAPPER_RE = re.compile(r"PROMO:\s*B[1-5]SAVE-\d{2}", re.I)
+_KEYCAP_EMOJI_RE = re.compile(r"[0-9#*]\ufe0f?\u20e3")
+_TEXT_EMOJI_WITH_VARIATION_RE = re.compile(
+    "[©®‼⁉™ℹ↔-↙↩↪⌨⏏⏭-⏯⏱⏲⏸-⏺Ⓜ〰〽㊗㊙]\ufe0f"
+)
 
 
 def _normalise(value: object) -> str:
@@ -42,21 +46,41 @@ def _is_emoji(char: str) -> bool:
         or 0x2600 <= cp <= 0x27BF
         or 0xFE00 <= cp <= 0xFE0F
         or 0x1F1E6 <= cp <= 0x1F1FF
+        or 0xE0020 <= cp <= 0xE007F
+        or cp == 0x20E3
         or cp == 0x200D
     )
 
 
-def clean_narrative_text(value):
-    """Accept None or a string; return cleaned text or the string 'NaN'."""
+def _remove_emoji(text: str) -> str:
+    """Remove single-code-point emoji and the common multi-code-point forms."""
+    text = _KEYCAP_EMOJI_RE.sub(" ", text)
+    text = _TEXT_EMOJI_WITH_VARIATION_RE.sub(" ", text)
+    return "".join(" " if _is_emoji(char) else char for char in text)
+
+
+def _clean_narrative(value: object, *, lowercase: bool) -> str:
     text = _normalise(value)
     text = _TAG_RE.sub(" ", text)
     text = _MARKER_RE.sub(" ", text)
     text = _URL_RE.sub(" ", text)
-    text = "".join(" " if _is_emoji(c) else c for c in text)
+    text = _remove_emoji(text)
     text = _REFERENCE_WRAPPER_RE.sub(" ", text)
     text = _PROMO_WRAPPER_RE.sub(" ", text)
-    text = re.sub(r"\s+", " ", text).strip().lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    if lowercase:
+        text = text.lower()
     return text if text else MISSING
+
+
+def clean_narrative_text(value):
+    """Accept None or a string; return lower-case cleaned text or 'NaN'."""
+    return _clean_narrative(value, lowercase=True)
+
+
+def clean_delivery_note(value):
+    """Clean a delivery note while preserving the source letter case."""
+    return _clean_narrative(value, lowercase=False)
 
 
 def _extract(pattern: re.Pattern[str], value: object) -> str:
@@ -85,7 +109,7 @@ def _is_latin_letter(char: str) -> bool:
 
 def build_latin_analysis(value):
     """Accept cleaned multilingual text; return Latin analysis or 'NaN'."""
-    text = _normalise(value)
+    text = _remove_emoji(_normalise(value))
     if not text or text == MISSING:
         return MISSING
     kept = []

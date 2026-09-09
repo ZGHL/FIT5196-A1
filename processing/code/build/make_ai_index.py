@@ -1,4 +1,4 @@
-"""Build the English Group030 AI records index from the five declared records."""
+"""Build the English Group030 AI records index from the six declared records."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ RECORDS = [
     {"id": "AI-01", "member": "Xinhang Ren (35134410)", "file": "AI-01.pdf",
      "purpose": "Assignment planning, interpretation of the specification and rubric, and quality-control guidance for the solution, mapping, text functions, EDA and report.",
      "affected": "Group030_solution.ipynb; Group030_source_to_target_mapping.csv; Group030_text_functions.py; Group030_EDA.ipynb; Group030_EDA.pdf; validation register; submission checklist.",
-     "verification": "Requirements were checked against the official specification and rubric. The final workflow passed 18/18 public text tests, 8/8 student-designed tests and 64/64 validation checks. Both notebooks were rerun in a clean offline marking-style workspace."},
-    {"id": "AI-02", "member": "Sizhe Hong (35381949)", "file": "AI-02.pdf",
+     "verification": "Requirements were checked against the official specification and rubric. The final workflow passed 18/18 public text tests, 14/14 student-designed tests and 66/66 validation checks. Both notebooks were rerun in a clean offline marking-style workspace."},
+    {"id": "AI-02", "member": "Guohou Zhang (35800275) & King Man Chan (36550779)", "file": "AI-02.pdf",
      "purpose": "Development of the validation framework for schema, types, missing values, keys, source row flow, overlap, arithmetic, temporal consistency and text processing.",
      "affected": "Validation and quality-control sections of Group030_solution.ipynb and the validation evidence referred to in the EDA report.",
-     "verification": "Recommendations were checked against the public data dictionary, source reconciliation counts and executable VAL-* register. The final register contains 64/64 PASS results and reports observed values rather than relying only on hard-coded expected counts."},
+     "verification": "Recommendations were checked against the public data dictionary, source reconciliation counts and executable VAL-* register. The final register contains 66/66 PASS results and reports observed values rather than relying only on hard-coded expected counts."},
     {"id": "AI-03", "member": "Yinglin Fang (34814248)", "file": "AI-03.pdf",
      "purpose": "Review of the six-table relational design, observation grain, primary and foreign keys, field allocation, cleaning and JSON/XML reconciliation logic.",
      "affected": "Relational transformations in Group030_solution.ipynb; field lineage in Group030_source_to_target_mapping.csv; schema, key, arithmetic and temporal validation.",
@@ -27,20 +27,27 @@ RECORDS = [
     {"id": "AI-04", "member": "Guohou Zhang (35800275)", "file": "AI-04.pdf",
      "purpose": "Review of bounded regular expressions, Unicode normalisation, multilingual preservation, narrative cleaning and related validation.",
      "affected": "Group030_text_functions.py; text-processing sections of Group030_solution.ipynb; related validation-register entries.",
-     "verification": "The implementation was checked against the published text contract, 18/18 public cases and 8/8 student-designed edge cases. Multilingual checks confirm that 303 reviews containing non-Latin script remain identified after cleaning."},
+     "verification": "The implementation was checked against the published text contract, 18/18 public cases and 14/14 student-designed edge cases. Multilingual checks confirm that 303 reviews containing non-Latin script remain identified after cleaning."},
     {"id": "AI-05", "member": "King Man Chan (36550779)", "file": "AI-05.pdf",
      "purpose": "Design of additional tests for narrative cleaning, order and product reference extraction, promotion extraction and Unicode helper functions.",
      "affected": "Student-designed test section of Group030_solution.ipynb and quality-control evidence for Group030_text_functions.py.",
-     "verification": "The additional cases were executed through the same expected-versus-actual test harness as the public suite. The final notebook reports 18/18 public cases and 8/8 student-designed cases passing."},
+     "verification": "The additional cases were executed through the same expected-versus-actual test harness as the public suite. The final notebook reports 18/18 public cases and 14/14 student-designed cases passing."},
+    {"id": "AI-06", "member": "Sizhe Hong (35381949)", "file": "AI-06.html",
+     "language": "English", "model_source": "HTML",
+     "purpose": "Guidance for Task 4 validation and Task 5 EDA, including stable VAL-* IDs, missing-value handling, primary/foreign-key diagnostics, coherent review relationship checks, statistical interpretation and zero-month time-series handling.",
+     "affected": "Validation register and quality-control sections of Group030_solution.ipynb; analytical design and interpretation in Group030_EDA.ipynb and Group030_EDA.pdf.",
+     "verification": "The record separates assignment-stated requirements from assumptions and recommends field-specific checks, expected-versus-actual evidence and row-level relationship diagnostics. Related implementation is covered by the final executable VAL-* register, which reports 66/66 PASS results."},
 ]
 
 
 def record_html(record: dict[str, str]) -> str:
     esc = {key: html.escape(value) for key, value in record.items()}
+    language = esc.get("language", "Chinese")
+    source_type = esc.get("model_source", "PDF")
     return f"""<article class="record"><h2>{esc['id']} — {esc['member']}</h2><table>
-    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied PDF</td></tr>
+    <tr><th>Tool and model</th><td>ChatGPT (OpenAI); exact model not recorded in the supplied {source_type} export</td></tr>
     <tr><th>Complete export filename</th><td><code>{esc['file']}</code></td></tr>
-    <tr><th>Record language</th><td>Chinese</td></tr>
+    <tr><th>Record language</th><td>{language}</td></tr>
     <tr><th>Purpose</th><td>{esc['purpose']}</td></tr>
     <tr><th>Affected submission work</th><td>{esc['affected']}</td></tr>
     <tr><th>Independent verification</th><td>{esc['verification']}</td></tr>
@@ -73,7 +80,7 @@ def build_html() -> str:
     code { font-family: "Courier New", monospace; font-size: 8.7pt; }
     footer { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 8.5pt; }
     """
-    pages = page(RECORDS[:2], 1, True) + page(RECORDS[2:], 2)
+    pages = page(RECORDS[:2], 1, True) + page(RECORDS[2:4], 2) + page(RECORDS[4:], 3)
     return f'<!doctype html><html><head><meta charset="utf-8"><title>Group030 AI Records Index</title><style>{css}</style></head><body>{pages}</body></html>'
 
 

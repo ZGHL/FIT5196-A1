@@ -66,11 +66,6 @@ def finish(ax, title=None, xlabel=None, ylabel=None, xgrid=False):
         ax.set_ylabel(ylabel, fontsize=9, color=MUTED)
 
 
-def frame(fig, num, question, unit, tables, note):
-    """Keep report prose outside the PNG so the plotted area stays readable."""
-    return None
-
-
 def save(fig, num, slug):
     descriptive_path = FIGURE_DIR / f"Figure_{num}_{slug}.png"
     report_path = FIGURE_DIR / f"Figure_{num}.png"
@@ -177,14 +172,6 @@ for j, (col, ttl) in enumerate([("sales_channel", "Sales channel"),
     finish(ax, ttl, "Share of orders", None, xgrid=True)
     ax.tick_params(labelsize=8.5)
 
-frame(fig, 1, "How are order values distributed, and how is order volume composed?",
-      "one row per canonical order; denominator = 5,000 orders",
-      "orders (no join required)",
-      f"Result: order value is right-skewed (median ${vals.median():,.0f} vs mean ${vals.mean():,.0f}; P99 ${q[.99]:,.0f}), so the mean overstates a typical basket and "
-      "median is the correct central measure. Channel, payment and season shares are all near-uniform (32-35% / 24-26% / 24-25%), "
-      "indicating no dominant route to market.\n"
-      "Limitation: the histogram mixes baskets of 1-5 line items, so the right tail reflects basket size as much as price; "
-      "composition counts orders, not revenue, so a uniform share does not imply equal revenue contribution.")
 save(fig, 1, "order_value_distribution_and_composition")
 
 # =============================================================================
@@ -225,8 +212,8 @@ means = oc.groupby("loyalty_tier")["order_total"].agg(["mean", "sem", "count"]).
 ax.bar(tier_order, means["mean"], yerr=1.96 * means["sem"], capsize=4,
        color=[SEQ[i] for i in range(4)], alpha=0.85, width=0.6,
        error_kw=dict(ecolor=SLATE, lw=1.2))
-for k, (m, n) in enumerate(zip(means["mean"], means["count"])):
-    ax.text(k, m + 130, f"${m:,.0f}", ha="center", fontsize=8.5,
+for k, (m, se, n) in enumerate(zip(means["mean"], means["sem"], means["count"])):
+    ax.text(k, m + 1.96 * se + 70, f"${m:,.0f}", ha="center", fontsize=8.5,
             fontweight="bold", color=INK)
     ax.text(k, 90, f"n={int(n):,}", ha="center", fontsize=7.6, color="white")
 ax.set_ylim(0, means["mean"].max() * 1.30)
@@ -250,15 +237,6 @@ finish(ax, "Customer revenue vs order count", "Orders placed in 2018",
        "Total revenue (AUD)")
 
 _segmed = oc.groupby("customer_segment").order_total.median()
-frame(fig, 2, "Do customer segment and loyalty tier explain order value?",
-      "left/centre: one row per order, n=5,000; right: one row per customer, n=500",
-      "orders \u22c8 customers on customer_id (many-to-one; row count verified unchanged at 5,000)",
-      f"Result: a genuine null. Median order value spans only ${_segmed.max()-_segmed.min():,.0f} across all four segments and the "
-      f"loyalty-tier means (${means['mean'].min():,.0f}-${means['mean'].max():,.0f}) have overlapping 95% confidence intervals, so "
-      f"neither attribute predicts basket size. Customer-level "
-      "revenue is instead driven almost entirely by order frequency (right panel), which fans out linearly with no tier separation.\n"
-      "Limitation: 5,000 orders over only 500 customers averages 10 orders each, so segment cells are wide but customer-level "
-      "points are few; a single 2018 period cannot separate tier effects from tenure, and tier is recorded as-at export, not as-at order.")
 save(fig, 2, "order_value_by_segment_and_loyalty")
 
 # =============================================================================
@@ -340,15 +318,6 @@ ax.text(0.98, 0.06, "Low price,\nhigh volume", transform=ax.transAxes,
         ha="right", va="bottom", fontsize=8, color=MUTED, style="italic")
 
 _infl = naive.order_total.sum() / orders.order_total.sum()
-frame(fig, 3, "Which categories drive revenue, and is that volume or price?",
-      "one row per order item; denominator = 15,723 items / 41,993 units / $16.12M line revenue",
-      "order_items \u22c8 products on product_id (many-to-one; rows unchanged at 15,723, revenue control total matched to the cent)",
-      f"Result: revenue and volume rank almost inversely. Home Entertainment and Laptop take {rev_share.iloc[0]+rev_share.iloc[1]:.1f}% of revenue from only "
-      f"{unit_share.iloc[0]+unit_share.iloc[1]:.1f}% of units, while Accessory sells the most units ({cat.units.iloc[-1]:,}) for the least revenue "
-      f"(${cat.revenue.iloc[-1]/1e6:.2f}M) - category value is set by price point, not popularity.\n"
-      f"Limitation: this is 2018 revenue, not margin; unit_cost is available and Accessory may still contribute more profit per unit. Critically, "
-      f"order-grain fields must not be summed at this grain - doing so across the orders-items-products fan-out inflates revenue {_infl:.2f}x "
-      f"(${naive.order_total.sum()/1e6:.1f}M vs the true ${orders.order_total.sum()/1e6:.1f}M).")
 save(fig, 3, "category_revenue_price_volume")
 
 # =============================================================================
@@ -372,9 +341,8 @@ ax.bar(monthly.index, monthly.revenue, width=20, color=BLUE, alpha=0.80,
        label="Monthly revenue (AUD)")
 ax.yaxis.set_major_formatter(money_m)
 mean_rev = monthly.revenue.mean()
-ax.axhline(mean_rev, color=SLATE, ls="--", lw=1.1)
-ax.text(monthly.index[0], mean_rev * 1.02, f"  mean ${mean_rev/1e6:.2f}M",
-        fontsize=8, color=SLATE, va="bottom")
+ax.axhline(mean_rev, color=SLATE, ls="--", lw=1.1,
+           label=f"Mean revenue (${mean_rev/1e6:.2f}M)")
 finish(ax, "Monthly revenue and order count show no seasonal cycle",
        None, "Revenue (AUD)")
 ax.set_ylim(0, monthly.revenue.max() * 1.22)
@@ -419,14 +387,6 @@ peak = hour.idxmax()
 ax.annotate(f"peak {peak:02d}:00", (peak, hour.max()), fontsize=8, color=VIOLET,
             xytext=(0, 8), textcoords="offset points", ha="center")
 
-frame(fig, 4, "How does demand move through the year, the week and the day?",
-      "one row per order; denominator = 5,000 orders spanning 2018-01-01 to 2018-12-31",
-      "orders (no join required); order_timestamp normalised to YYYY-MM-DD HH:MM:SS from two source formats",
-      "Result: monthly volume is flat (406-438 orders, a 7.9% peak-to-trough band) with no Q4 or holiday lift, and weekday/weekend "
-      "rates are almost identical. The only real structure is intraday - ordering is concentrated in trading hours and collapses "
-      "overnight, which is the pattern that should drive staffing.\n"
-      "Limitation: a single year cannot separate seasonality from trend, and 'Season' is a supplied label rather than a derived one. "
-      "Timestamps carry no timezone, so the hour axis assumes a single local zone for all channels.")
 save(fig, 4, "temporal_demand_patterns")
 
 # =============================================================================
@@ -486,23 +446,13 @@ ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.55,
 ax.set_xticks(range(len(g)))
 ax.set_xticklabels([f"{i.replace('_',' ')}\n(n={int(n):,})"
                     for i, n in zip(g.index, g["count"])], fontsize=8.3)
-for k, v in enumerate(g["mean"]):
-    ax.text(k, v + 0.06, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
+for k, (v, se) in enumerate(zip(g["mean"], g["sem"])):
+    ax.text(k, v + 1.96 * se + 0.07, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
 ax.set_ylim(0, 4.6)
 finish(ax, "Rating by value perception", None, "Mean star rating")
 
 _len_med = reviews.groupby("writing_style").review_length_chars.median()
 _ve = reviews.groupby("value_experience").rating.mean()
-frame(fig, 5, "What drives review length, helpfulness and star rating?",
-      "one row per canonical product review; denominator = 7,000 reviews",
-      "product_reviews (no join required); review_length_chars derived from review_body_clean per the Task 3 cleaning contract",
-      f"Result: ratings skew positive - {pct[4]+pct[5]:.1f}% are 4-5 star against {pct[1]+pct[2]:.1f}% at 1-2 star, so the mean of "
-      f"{reviews.rating.mean():.2f} falls in a thin 3-star middle that few reviewers actually chose. "
-      f"Length is governed by writing style (median {_len_med['concise']:,.0f} chars for 'concise' vs {_len_med['narrative']:,.0f} for 'narrative', "
-      f"a {_len_med['narrative']/_len_med['concise']:.1f}x gap) and is flat across ratings, as is helpfulness. Only stated value perception moves "
-      f"the rating, and modestly ({_ve['poor_value']:.2f} vs {_ve['good_value']:.2f}).\n"
-      "Limitation: writing_style and value_experience are supplied source labels, not derived from the text, so this shows label-to-outcome "
-      "consistency rather than an independent NLP finding. helpful_votes has no exposure denominator - votes are not normalised by views.")
 save(fig, 5, "review_text_behaviour")
 
 # =============================================================================
@@ -541,7 +491,8 @@ ax.hist(non.review_length_chars, bins=bins, color=ROSE, alpha=0.60,
         label=f"Contains non-Latin (n={len(non):,})", density=True)
 ax.axvline(lat.review_length_chars.median(), color=BLUE, ls="--", lw=1.6)
 ax.axvline(non.review_length_chars.median(), color=ROSE, ls="--", lw=1.6)
-ax.legend(fontsize=8, loc="upper right")
+ax.legend(fontsize=8, loc="upper left", frameon=True,
+          facecolor="white", edgecolor="none", framealpha=0.95)
 ax.set_yticks([])
 finish(ax, "Character length by script class",
        "Review length (characters)", "Density")
@@ -573,15 +524,6 @@ ax.text(0.50, 0.96,
         bbox=dict(facecolor="#fef3c7", edgecolor="#d97706", linewidth=0.8,
                   boxstyle="round,pad=0.35"))
 
-frame(fig, 6, "Does script class distort the review length measures?",
-      "one row per review; denominator = 7,000 reviews (6,697 Latin-only, 303 containing non-Latin letters)",
-      "product_reviews; script class from contains_non_latin_script, both measures derived from review_body_clean",
-      "Result: a measurement artefact, not a behavioural one. Non-Latin reviews average 0.62x the characters of Latin-only reviews but only "
-      "0.46x the whitespace tokens, because CJK and Japanese do not delimit words with spaces - word_count systematically under-counts them. "
-      "Note also that 745 reviews contain non-ASCII characters while only 303 are truly non-Latin: the 442 difference is European diacritics, "
-      "so an ASCII test would have mislabelled them.\n"
-      "Limitation: review_word_count is not comparable across scripts and should not be used for cross-language analysis without a "
-      "script-aware tokeniser. With only 303 non-Latin reviews spread across 13 language codes, per-language cells are too thin to test individually.")
 save(fig, 6, "multilingual_text_measures")
 
 # =============================================================================
@@ -607,19 +549,21 @@ cnt = do.pivot_table(index="carrier", columns="service_level",
 piv = piv.loc[piv.mean(axis=1).sort_values().index]
 x = np.arange(len(piv))
 w = 0.36
+overall = do.on_time_in_full.mean() * 100
 for k, sl in enumerate(["Standard", "Express"]):
     bars = ax.bar(x + (k - 0.5) * w, piv[sl], w, color=[BLUE, TEAL][k],
                   alpha=0.85, label=f"{sl}")
     for b, v, n in zip(bars, piv[sl], cnt.loc[piv.index, sl]):
-        ax.text(b.get_x() + b.get_width()/2, v + 0.6, f"{v:.1f}%",
+        label_y = max(v + 2.4, overall + 2.4)
+        ax.text(b.get_x() + b.get_width()/2, label_y, f"{v:.1f}%",
                 ha="center", fontsize=8, color=INK)
         ax.text(b.get_x() + b.get_width()/2, 4, f"{sl}  n={n:,}", ha="center",
                 va="bottom", fontsize=7.6, color="white", rotation=90)
-overall = do.on_time_in_full.mean() * 100
 ax.axhline(overall, color=ROSE, ls="--", lw=1.4)
 ax.set_xlim(-0.62, 3.85)
-ax.text(3.83, overall + 2.0, f"overall {overall:.1f}%",
-        fontsize=8, color=ROSE, ha="right")
+ax.text(3.83, overall - 1.8, f"overall {overall:.1f}%",
+        fontsize=8, color=ROSE, ha="right", va="top",
+        bbox=dict(facecolor="white", edgecolor="none", pad=1.2))
 ax.set_xticks(x)
 ax.set_xticklabels(piv.index, fontsize=8.8)
 ax.set_ylim(0, 104)
@@ -687,15 +631,6 @@ ax.set_xticklabels(exp.index, fontsize=8.4)
 ax.set_ylim(0, exp.hrs.max() * 1.22)
 finish(ax, "Expedited flag vs fulfilment", None, "Mean fulfilment (hours)")
 
-frame(fig, 7, "Where does delivery performance actually vary?",
-      f"one row per completed order delivery; denominator = {len(do):,} deliveries ({int((~do.on_time_in_full).sum()):,} late, {100*(~do.on_time_in_full).mean():.1f}%)",
-      "deliveries \u22c8 orders on order_id (one-to-one; row count verified unchanged at 5,000)",
-      f"Result: OTIF is {overall:.1f}% overall and remarkably uniform - the carrier spread is only {car.max()-car.min():.1f} points "
-      f"({car.index[0]} {car.iloc[0]:.1f}% to {car.index[-1]} {car.iloc[-1]:.1f}%) and Express barely differs from Standard, so service "
-      f"level is not buying reliability. Delay causes split near-evenly across weather, carrier capacity and warehouse congestion "
-      f"({', '.join(f'{i.replace(chr(95),chr(32))} {100*v/dr.sum():.0f}%' for i, v in dr.items())}), meaning no single fixable bottleneck dominates.\n"
-      "Limitation: shipping distance spans only 0.5-10.1 km across three metropolitan warehouses, far too narrow a range to test a distance "
-      "effect on fulfilment time. Carrier is not randomly assigned, so any carrier gap may reflect route or product mix rather than performance.")
 save(fig, 7, "delivery_operational_performance")
 
 # =============================================================================
@@ -723,8 +658,8 @@ g = rd.groupby("on_time_in_full").rating.agg(["mean", "sem", "count"])
 g.index = ["Late", "On time"]
 ax.bar(range(2), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.5,
        color=[ROSE, TEAL], alpha=0.85, error_kw=dict(ecolor=SLATE, lw=1.2))
-for k, (v, n) in enumerate(zip(g["mean"], g["count"])):
-    ax.text(k, v + 0.16, f"{v:.2f}", ha="center", fontsize=8.8, fontweight="bold")
+for k, (v, se, n) in enumerate(zip(g["mean"], g["sem"], g["count"])):
+    ax.text(k, v + 1.96 * se + 0.07, f"{v:.2f}", ha="center", fontsize=8.8, fontweight="bold")
     ax.text(k, 0.14, f"n={int(n):,}", ha="center", fontsize=7.6, color="white")
 ax.set_xticks(range(2))
 ax.set_xticklabels(g.index, fontsize=8.8)
@@ -775,8 +710,8 @@ ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=5, width=0.5,
 ax.set_xticks(range(len(g)))
 ax.set_xticklabels([f"{i}\n(n={int(n):,})" for i, n in zip(g.index, g["count"])],
                    fontsize=8.4)
-for k, v in enumerate(g["mean"]):
-    ax.text(k, v + 0.14, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
+for k, (v, se) in enumerate(zip(g["mean"], g["sem"])):
+    ax.text(k, v + 1.96 * se + 0.07, f"{v:.2f}", ha="center", fontsize=8.5, fontweight="bold")
 ax.set_ylim(0, 4.9)
 finish(ax, "Rating by service level", None, "Mean star rating")
 
@@ -789,23 +724,12 @@ ax.bar(range(len(g)), g["mean"], yerr=1.96 * g["sem"], capsize=4, width=0.6,
        error_kw=dict(ecolor=SLATE, lw=1.1))
 ax.set_xticks(range(len(g)))
 ax.set_xticklabels([lbl.get(i, i) for i in g.index], fontsize=8)
-for k, (v, n) in enumerate(zip(g["mean"], g["count"])):
-    ax.text(k, v + 0.14, f"{v:.2f}", ha="center", fontsize=8.2, fontweight="bold")
+for k, (v, se, n) in enumerate(zip(g["mean"], g["sem"], g["count"])):
+    ax.text(k, v + 1.96 * se + 0.07, f"{v:.2f}", ha="center", fontsize=8.2, fontweight="bold")
     ax.text(k, 0.14, f"n={int(n):,}", ha="center", fontsize=7.2, color="white")
 ax.set_ylim(0, 4.9)
 finish(ax, "Rating by delay reason", None, "Mean star rating")
 
-frame(fig, 8, "Does delivery performance shape customer ratings?",
-      "one row per review; denominator = 7,000 reviews covering 4,044 distinct orders",
-      "product_reviews \u22c8 deliveries on order_id (many-to-one; rows unchanged at 7,000)",
-      f"Result: a clean null across every operational cut. Late deliveries score {rd[~rd.on_time_in_full].rating.mean():.2f} vs "
-      f"{rd[rd.on_time_in_full].rating.mean():.2f} for on-time, the rating mix is visually identical, ratings are flat from 0 to 5 days late "
-      f"with overlapping confidence intervals, and service level and delay reason make no difference. Yet stated delivery_experience matches "
-      f"the recorded OTIF flag on {100*((rd.delivery_experience=='delayed')==(~rd.on_time_in_full)).mean():.1f}% of reviews, so the operational "
-      f"data is reported faithfully - it simply does not transfer to the star rating.\n"
-      "Limitation: reviews are many-to-one onto deliveries (1.73 reviews per reviewed order), so delivery attributes repeat across sibling "
-      "reviews and rows are not independent - the confidence intervals above are therefore optimistic. Only 4,044 of 5,000 orders were "
-      "reviewed, and non-reviewers may be exactly the dissatisfied group, which is a survivorship risk this data cannot resolve.")
 save(fig, 8, "delivery_impact_on_reviews")
 
 figure_register = pd.DataFrame([

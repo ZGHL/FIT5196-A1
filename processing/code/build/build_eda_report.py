@@ -68,7 +68,7 @@ def figure_block(text: str, number: int, css_class: str = "") -> str:
     image_uri = (FIGURES / f"Figure_{number}.png").resolve().as_uri()
     return f"""
     <article class="figure-block {css_class}">
-      <h3>2.{number} {inline(title)}</h3>
+      <h3>2.{number} Figure {number} — {inline(title)}</h3>
       <img src="{image_uri}" alt="Figure {number}">
       <div class="figure-note">{paragraphs(body)}</div>
     </article>
@@ -197,6 +197,8 @@ def build_html() -> str:
     .table-summary th { border-top: 1pt solid #111; border-bottom: 1pt solid #111; }
     .table-summary.coverage { margin: 3mm 0 0; font-size: 9pt; }
     .table-summary.coverage th, .table-summary.coverage td { padding: 1.1mm 2mm; }
+    .table-summary.assurance { margin: 2.5mm 0; font-size: 8.2pt; }
+    .table-summary.assurance th, .table-summary.assurance td { padding: 0.8mm 1.5mm; vertical-align: top; }
     .supporting-table { break-inside: avoid; margin: 2mm 0 5mm; font-size: 8.3pt; }
     .supporting-table p { margin-bottom: 1mm; }
     .supporting-table .table-summary { margin: 0; }
@@ -242,11 +244,17 @@ def build_html() -> str:
       <h1 class="section-title">1. Data and analytical approach</h1>
       <h2>1.1 Start from the submitted relational data</h2><p>The analysis begins by loading the six standardised CSV files produced in the solution notebook. The tables contain 5,000 orders, 15,723 order-item lines, 500 customers, 5,000 deliveries, 1,000 products and 7,000 reviews. Identifiers remain strings; only the numeric, date and Boolean fields used below are converted after loading.</p>
       <table class="table-summary coverage"><thead><tr><th>Table</th><th>Rows</th><th>Columns</th><th>Role in the EDA</th></tr></thead><tbody><tr><td>orders</td><td>5,000</td><td>23</td><td>Order value, discount and time</td></tr><tr><td>order_items</td><td>15,723</td><td>6</td><td>Product-level sales contribution</td></tr><tr><td>customers</td><td>500</td><td>20</td><td>Prior customer activity</td></tr><tr><td>deliveries</td><td>5,000</td><td>20</td><td>OTIF and fulfilment</td></tr><tr><td>products</td><td>1,000</td><td>21</td><td>Category and catalogue cost</td></tr><tr><td>product_reviews</td><td>7,000</td><td>21</td><td>Rating and review timing</td></tr></tbody></table>
-      <h2>1.2 Check the data before analysis</h2><p>Before choosing the figures, we rechecked that the row count of each table matched its primary-key count. All six checks passed. For relational figures, the parent key was required to be unique and the left-hand row count had to remain unchanged. Orders were aggregated before the customer analysis, and multiple reviews were averaged within order before the delivery join. These checks protect the observation unit used in each chart.</p>
-      <p>The solution notebook provides the complete transformation and validation record. For this EDA, the most relevant results are zero orphan keys across the submitted relationships, a $0.00 maximum arithmetic difference, consistent delivery and OTIF fields, and preservation of the 303 reviews containing non-Latin script.</p>
+      <h2>1.2 Check the data before analysis</h2><p>Before choosing the figures, we rechecked that the row count of each table matched its primary-key count. All six checks passed. For relational figures, the parent key was required to be unique and the left-hand row count had to remain unchanged. Figure 2 retains order grain for its group comparisons and aggregates to customer grain only for its customer scatter. Figure 8 retains review grain and separately reports the number of distinct reviewed orders. These checks protect the observation unit used in each chart.</p>
+      <table class="table-summary assurance"><thead><tr><th>Preparation decision</th><th>Implementation</th><th>Validation evidence</th></tr></thead><tbody>
+      <tr><td>Structured extraction first</td><td>Parse JSON/XML before regex cleaning.</td><td><code>VAL-SCHEMA-01</code>–<code>07</code>: six exact schemas pass.</td></tr>
+      <tr><td>Standardise before reconciliation</td><td>Compare converted fields by stable keys.</td><td><code>VAL-DUP-01</code>, <code>VAL-OVERLAP-01</code>, <code>VAL-CONFLICT-01</code>: separate counts; zero conflicts.</td></tr>
+      <tr><td>Retain relational grains</td><td>Keep six entity tables and one-to-many links.</td><td><code>VAL-PK-01</code>–<code>06</code>, <code>VAL-FK-01</code>–<code>08</code>: complete keys; zero orphans.</td></tr>
+      <tr><td>Apply published arithmetic and time order</td><td>Round line revenue before order totals; derive delivery timing.</td><td><code>VAL-ARITH-00</code>–<code>03</code>, <code>VAL-TIME-03</code>: $0.00 maximum difference; zero timing conflicts.</td></tr>
+      <tr><td>Apply field-specific text rules</td><td>Lower-case three designated narratives; preserve delivery-note case.</td><td><code>VAL-TEXT-02</code>, <code>09</code>–<code>10</code>: 303 non-Latin reviews retained; case checks pass.</td></tr>
+      </tbody></table>
       <h2>1.3 Move from table structure to analytical questions</h2><p>We first examined order-value distribution and composition, then customer groups, product categories and time. We next tested review behaviour, multilingual text measurement, delivery operations and the delivery-review relationship. This sequence progresses from single-table description to checked relational analysis.</p>
-      <p>Continuous group means are reported with 95% confidence intervals, and OTIF proportions use Wilson 95% intervals. The figures describe associations in this export and are not interpreted as causal effects.</p>
-      <h2>1.4 Assessed EDA coverage</h2><table class="table-summary coverage"><thead><tr><th>Requirement</th><th>Evidence</th><th>Observation unit</th></tr></thead><tbody><tr><td>Univariate distribution/composition</td><td>Figure 1</td><td>Order</td></tr><tr><td>Bivariate comparison</td><td>Figures 2 and 5</td><td>Order, customer or review</td></tr><tr><td>Multivariate/segmented analysis</td><td>Figures 3, 7 and 8</td><td>Item, delivery or review</td></tr><tr><td>Temporal pattern</td><td>Figure 4</td><td>Order aggregated by time</td></tr><tr><td>Review/text behaviour</td><td>Figures 5, 6 and 8</td><td>Review</td></tr><tr><td>Delivery/operational performance</td><td>Figures 7 and 8</td><td>Delivery or review</td></tr><tr><td>Checked relational analysis</td><td>Figures 2, 3, 7 and 8</td><td>Order, item, delivery and review</td></tr></tbody></table>
+      <p>Continuous group means are reported with 95% confidence intervals. OTIF panels show their observed denominator and the report states the relevant uncertainty or alternative explanation. Results are stated at their observed grain; causal evaluation would require a separate research design.</p>
+      <h2>1.4 Assessed EDA coverage</h2><p>Figures 1–8 collectively cover univariate distribution/composition, bivariate comparison, multivariate/segmented analysis, temporal patterns, review/text behaviour and delivery/operational performance. Figures 2, 3, 7 and 8 are checked relational analyses.</p>
       <h1 class="section-title">2. Assessed visualisations</h1>
       {figure_pair(text, 1)}{figure_pair(text, 3)}{figure_pair(text, 5)}{figure_pair(text, 7)}
       <h1 class="section-title">3. Evidence-based findings</h1>{finding_list(finding_items, 1)}
