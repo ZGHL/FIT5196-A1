@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FIT5196 A1 AI Chat Record</title>
+  <style>
+    body { margin: 0; background: #f5f6f8; color: #1f2937; font-family: Arial, sans-serif; line-height: 1.5; }
+    main { max-width: 980px; margin: 32px auto; padding: 0 20px 48px; }
+    h1 { color: #111827; font-size: 28px; margin-bottom: 8px; }
+    .scope { color: #4b5563; margin-bottom: 28px; }
+    .message { background: white; border: 1px solid #d9dde5; border-radius: 10px; margin: 16px 0; overflow: hidden; }
+    .role { padding: 9px 14px; font-weight: 700; background: #e8eef9; border-bottom: 1px solid #d9dde5; }
+    .assistant .role { background: #edf7ed; }
+    .attachment .role { background: #fff4df; }
+    pre { margin: 0; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.55 Consolas, "Courier New", monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>FIT5196 A1 AI Chat Record</h1>
+  <p class="scope">Complete conversation record beginning with the user message specified for export. Messages are preserved in the languages actually used.</p>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>English pls  I am currently working on Task 4 Data Validation and Task 5 EDA for FIT5196 Assessment 1. I hope to understand the requirements, write the code, run the analysis and interpret the results, and you will provide explanations and reviews. Here are the AI usage regulations for the course: [paste full terms]. Please distinguish which ones explicitly allow, which ones explicitly prohibit, and which ones do not specify. Do not make judgments for the course based on general experience.</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>Please paste the full AI-use terms. The text currently contains only `[paste full terms]`, so there is nothing I can classify yet.
+
+From the A1 specification alone:
+
+- Explicitly allowed: Generative AI may be used to prepare A1, subject to University and unit policy.
+- Explicitly required: Submit the signed AI-use declaration. If conversational AI was used, include complete assignment-related chat exports and an English index in `AI_records/`. Independently verify AI-assisted code and claims.
+- Not specified: The A1 specification does not state which specific AI assistance is allowed or prohibited for Task 4 Data Validation or Task 5 EDA.
+- No inference: I will not classify anything as allowed or prohibited based on general practice.
+
+Once you paste the terms, I will label each rule as “explicitly allowed,” “explicitly prohibited,” or “not specified,” without making course-policy assumptions.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>Task 4 requires an executable validation register that covers schema, primary keys, foreign keys, amounts, times, and multiple languages. Each item should have a stable ID, observation results, and PASS/FAIL status. Task 5 requires 6-8 diagrams covering six types of analyses, involving at least four tables and two correct associations. Please organize these requirements into a list that I can complete item by item, specifying what evidence needs to be left for each item, and do not write the implementation code for me.</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>## Task 4 — Executable validation register
+
+For every check, leave:
+
+- A stable ID, such as `VAL-PK-01`
+- What is being tested
+- Executed result or a compact evidence table
+- `PASS` or `FAIL`
+- Interpretation and, if failed, justified treatment
+
+Complete these items:
+
+1. **Schema and types**
+   - Six required tables exist.
+   - Fields, field order, and required/nullable status match the data dictionary.
+   - Dates, timestamps, numbers, booleans, identifiers, and literal string `NaN` are represented correctly.
+   - Evidence: expected-versus-actual schema comparison and counts of type/null violations.
+
+2. **Primary keys**
+   - Each table’s primary key is non-null and unique.
+   - Evidence: row count, non-null key count, distinct key count, duplicate-key sample/count.
+
+3. **Foreign keys**
+   - Validate all published relationships, including orders→customers, items→orders/products, deliveries→orders, and reviews→orders/items/products/customers.
+   - Evidence: unmatched-child-key count for each relationship, ideally with a small sample if failures occur.
+
+4. **Allowed values and sensible ranges**
+   - Check categories, ratings, quantities, prices, coordinates, delivery measures, and other meaningful bounds.
+   - Evidence: category frequency tables and counts of out-of-range values.
+
+5. **Source coverage and row flow**
+   - Record rows before and after parsing, flattening, standardisation, deduplication, and canonicalisation.
+   - Demonstrate that both JSON and XML sources are considered where applicable.
+   - Evidence: a row-flow table and overlap/deduplication counts derived from the sources.
+
+6. **Within-source duplication and cross-source overlap**
+   - Detect overlap using stable business keys and compare normalised fields before retaining one canonical row.
+   - Do not use hard-coded IDs or source-precedence assumptions.
+   - Evidence: counts by source/overlap category, comparison outcome, and conflict count.
+
+7. **Order arithmetic**
+   - Confirm `line_revenue = quantity × unit_price`, rounded to two decimals.
+   - Confirm `order_price` equals summed rounded line revenues.
+   - Confirm `order_total = order_price − coupon_discount + delivery_charges`.
+   - Confirm GST is `order_price / 11`, rounded to two decimals, and is not added again.
+   - Evidence: maximum absolute difference, number of failures using the 0.01 tolerance, and representative failed rows if any.
+
+8. **Temporal logic**
+   - Check sensible ordering between order timestamp, dispatch date, promised date, delivered date, and review timestamp where applicable.
+   - Evidence: count of invalid sequences and examples or an explicit zero-failure result.
+
+9. **Text-reference extraction**
+   - Verify extracted order references, product SKUs, and promotional codes.
+   - Include all supplied public cases plus your own matched, unmatched, missing, multilingual, and near-match cases.
+   - Evidence: test-case input, expected output, actual output, and PASS/FAIL.
+
+10. **Multilingual text handling**
+   - Confirm cleaned reviews retain valid multilingual text.
+   - Confirm Latin-analysis output preserves Latin letters and diacritics while removing non-Latin letters.
+   - Confirm `contains_non_latin_script` is correct and `NaN` is handled as the literal string.
+   - Evidence: a compact table of multilingual examples and outcomes.
+
+## Task 5 — EDA report checklist
+
+Create **6–8 labelled figures only**. Across the first 6–8 figures, cover all six categories below, use at least four of the six output tables, and include at least two valid relational analyses.
+
+For every figure, leave:
+
+- Figure number and clear title
+- Analytical question
+- Observation unit and denominator
+- Tables used and join key(s), if joined
+- Aggregation method and a check against join multiplication
+- Interpretation
+- One material limitation
+
+Required coverage:
+
+1. **Univariate distribution or composition**
+   - One-variable distribution or category composition.
+   - Evidence: denominator and appropriate chart choice.
+
+2. **Bivariate relationship or group comparison**
+   - Compare two variables or groups.
+   - Evidence: define comparison groups and the metric being compared.
+
+3. **Multivariate or segmented relationship**
+   - Examine a relationship across a third grouping/segment.
+   - Evidence: explain each variable and avoid over-claiming patterns.
+
+4. **Temporal pattern**
+   - Show change over time at an appropriate grain.
+   - Evidence: date/timestamp basis, aggregation period, and missing-period treatment.
+
+5. **Review or text behaviour**
+   - Analyse review language, length, rating, helpful votes, writing style, or related review measures.
+   - Evidence: review-level denominator and handling of literal `NaN`.
+
+6. **Delivery or operational performance**
+   - Analyse delivery outcomes in relation to an order, customer, product, or review characteristic.
+   - Evidence: valid join path and metric defined at the intended grain.
+
+7. **Optional Figures 7–8**
+   - Add only if they answer genuinely distinct questions; do not use them as duplicate versions of earlier analysis.
+
+After the figures, write exactly:
+
+- **10 numbered evidence-based findings:** each cites a figure/statistic, gives magnitude and denominator, explains business relevance, states uncertainty or an alternative explanation, and gives a proportionate implication.
+- **5 numbered ML questions:** together use at least two problem types; each states the decision, unit, target/objective, decision-time predictors, validation split, metric, and leakage/fairness/deployment risk.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>I would like to categorize them using VAL-SCHEMA-01, VAL-PK-01, VAL-FK-01, VAL-ARITH-01, VAL-TIME-01 and VAL-TEXT-01. Please explain how to maintain the stability of the IDs, avoid changes in the numbering after modifying the check sequence, and how to prevent duplicate IDs when merging the registration forms of team members.</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>Treat each ID as a permanent identifier for a validation purpose, not as the check’s current position in the notebook.
+
+Use your requested top-level IDs like this:
+
+- `VAL-SCHEMA-01` — schema, field order, types, nullability, literal `NaN`
+- `VAL-PK-01` — primary-key completeness and uniqueness
+- `VAL-FK-01` — foreign-key integrity
+- `VAL-ARITH-01` — line, order, GST, discount, and total reconciliation
+- `VAL-TIME-01` — timestamp and delivery-date ordering
+- `VAL-TEXT-01` — extraction, cleaning, multilingual, and public text tests
+
+To keep IDs stable:
+
+- Assign an ID once, then never renumber it, even if you move its code cell, delete another check, or insert a new check earlier in the notebook.
+- Keep the ID in both the check heading and its displayed results, for example `### VAL-FK-01 Foreign-key integrity`.
+- Add new checks with a new unused suffix, such as `VAL-FK-02`, rather than renaming existing IDs.
+- If a check becomes unnecessary, retain a short record such as “Retired — superseded by VAL-FK-03” instead of reusing its ID.
+- If one check expands into several checks, preserve the original ID for the original scope and create new IDs for the additional scopes.
+
+For team merging, maintain one shared validation-register table with columns such as:
+
+| ID | Owner | Check purpose | Status | Evidence location | Notes |
+|---|---|---|---|---|---|
+| VAL-PK-01 | Member A | PK uniqueness/completeness | PASS | Notebook §6.2 | All six tables |
+| VAL-FK-01 | Member B | FK integrity | PASS | Notebook §6.2 | Eight relationships |
+
+Before merging work:
+
+1. Allocate ID ranges by category or member, for example:
+   - Member A: `VAL-SCHEMA-01` to `VAL-SCHEMA-09`
+   - Member B: `VAL-PK-01` to `VAL-PK-09` and `VAL-FK-01` to `VAL-FK-09`
+   - Member C: `VAL-ARITH-01` to `VAL-ARITH-09`
+   - Member D: `VAL-TIME-01` to `VAL-TIME-09` and `VAL-TEXT-01` to `VAL-TEXT-09`
+
+2. Before adding a new item, check the shared register for the next available suffix.
+
+3. During the final merge, run a duplicate-ID check across notebook headings and the register. Every ID should appear once as the canonical register entry; references elsewhere should point to it rather than create a second check.
+
+4. Keep the category prefix meaningful. Do not use `VAL-02` or renumber IDs merely because the notebook now has a different order.
+
+A practical extension is to use `VAL-FK-01` as the summary check and create supporting checks such as `VAL-FK-02` for order-related relationships and `VAL-FK-03` for review-related relationships. This keeps citations in the EDA report stable even when the notebook grows.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>The rule for handling missing values in the assignment is as follows: [paste original text]. I have noticed that there might be empty strings, spaces, None, true NaN values, and the text "NaN" in the CSV file. Please explain the differences between these situations and how to read the CSV file so as not to confuse them. Do not assume that all fields allow for missing values.</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>The assignment text was not included; it still shows `[paste original text]`. I therefore will not infer any additional missing-value rule beyond the published A1 specification.
+
+The key distinction is that a CSV stores characters, not Python values. After reading it, these may look similar but mean different things:
+
+| Raw CSV situation | Meaning before parsing | Risk with default CSV reading |
+|---|---|---|
+| Empty field: `,,` | No characters were written | Often converted into a true missing value |
+| Spaces: `,   ,` | A non-empty string containing whitespace | May remain a string unless deliberately trimmed |
+| `None` | Literal characters `None` in a CSV | May be automatically treated as missing by some readers |
+| `NaN` / `nan` | Literal characters in a CSV | May be automatically treated as a numeric missing value |
+| True Python/NumPy/pandas missing value | Exists only after parsing or in memory | Not distinguishable from some textual forms after careless parsing |
+| Literal string `"NaN"` | The three characters `N`, `a`, `N` | A required output sentinel for prescribed missing **string** results in A1 |
+
+For A1, the literal string `NaN` is not the same as a true missing value. It is required only where the output contract prescribes a missing string result, such as text-cleaning or reference-extraction outputs. It must not be used in required numeric or Boolean fields.
+
+When reading submitted or generated CSVs for validation:
+
+- Disable the reader’s default missing-value conversion so that literal `NaN`, `None`, and blank fields are initially visible as text.
+- Keep identifier columns as strings to preserve leading zeros.
+- Inspect raw values before stripping whitespace, converting types, or replacing any values.
+- Apply missing-value rules separately for each target field, based on `public_data_dictionary.csv`.
+- Convert only the values that the specific field contract permits to true missing values.
+- For required fields, treat an empty value, whitespace-only value, true missing value, or inappropriate literal `NaN` as a validation failure unless the dictionary explicitly allows it.
+- For nullable fields, distinguish a permitted true missing value from the prescribed literal `NaN` sentinel. They are not interchangeable.
+
+A useful validation record would explicitly report counts for each field of:
+
+- empty strings;
+- whitespace-only strings;
+- literal `None`;
+- literal `NaN`;
+- true parsed missing values;
+- invalid missing representations for that field.
+
+Do not globally replace `""`, `"None"`, `"NaN"`, or whitespace with missing values across all six tables. That could destroy required identifiers, prescribed text sentinels, or valid categorical values.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>I know that the existence of each foreign key number does not mean that the relationship pairing is correct. For instance, a comment might refer to order A, but it might also refer to the details belonging to order B. Please help me list out the relationships that need to be simultaneously established among comments, orders, details, goods, and customers. I will write the checks based on these rules myself.</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>For `product_reviews`, validate the linked entities as one coherent relationship chain, not only as independent foreign-key membership.
+
+Each review row should satisfy all of these simultaneously:
+
+1. `review.order_id` exists in `orders.order_id`.
+
+2. `review.order_item_id` exists in `order_items.order_item_id`.
+
+3. The referenced order item belongs to the referenced order:
+
+   `order_items.order_item_id = review.order_item_id`  
+   and  
+   `order_items.order_id = review.order_id`
+
+4. The referenced product exists in `products.product_id`.
+
+5. The referenced order item is for the referenced product:
+
+   `order_items.product_id = review.product_id`
+
+6. The referenced customer exists in `customers.customer_id`.
+
+7. The referenced order belongs to the referenced customer:
+
+   `orders.customer_id = review.customer_id`
+
+So the intended chain is:
+
+```text
+product_reviews
+  ├─ order_id ───────────────► orders.order_id
+  │                              └─ customer_id = review.customer_id
+  ├─ order_item_id ──────────► order_items.order_item_id
+  │                              ├─ order_id = review.order_id
+  │                              └─ product_id = review.product_id
+  ├─ product_id ─────────────► products.product_id
+  └─ customer_id ────────────► customers.customer_id
+```
+
+Your check should therefore flag a review when any of these occur:
+
+- the order, item, product, or customer key does not exist;
+- the item exists but belongs to a different order;
+- the item exists but represents a different product;
+- the order exists but belongs to a different customer.
+
+This is stronger than checking the four review foreign keys independently and directly addresses mismatched pairings such as “a valid item from order B attached to a review for order A.”</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>When pandas reads a CSV file, why might it mistakenly confuse the text "NaN" with actual missing values? How would this affect the missing value detection and the calculation of comment length?</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>By default, pandas treats several text tokens as missing-value markers when reading CSV files. These commonly include `NaN`, `nan`, empty fields, and often `None`. Therefore, the literal three-character string `"NaN"` may be converted into pandas’ actual missing value (`np.nan`).
+
+This matters in A1 because `"NaN"` is sometimes a required text sentinel, not an ordinary missing value.
+
+Effects on missing-value detection:
+
+- A check for true missing values, such as `isna()`, may incorrectly count prescribed `"NaN"` text outputs as missing.
+- You can no longer reliably distinguish:
+  - an empty CSV field,
+  - a genuine parsed missing value, and
+  - the required literal string `"NaN"`.
+- A required text output might appear to violate completeness even though it correctly contains the prescribed sentinel.
+
+Effects on review/comment length:
+
+- If `"NaN"` remains a string and you calculate character length naively, it produces length `3` and potentially one word. That is incorrect for a review with no human-readable text.
+- If pandas converts it to actual missing, ordinary string operations may return missing values, errors, or inconsistent results depending on how they are applied.
+- The A1 rule is to preserve the intended sentinel behaviour: when cleaned review text is the literal `"NaN"`, it should not be treated as a real three-character review. Its character and word counts must follow the assignment’s specified missing-text behaviour, rather than counting the letters `N-a-N`.
+
+For validation, read the CSV with default NA conversion disabled, then apply field-specific checks. This lets you preserve `"NaN"` as text long enough to distinguish it from actual missing values and calculate review lengths correctly.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>During the primary key check, what do duplicated().sum(), nunique(), and the total number of rows respectively represent? If a certain number appears three times, what are the "number of duplicate numbers" and "the extra duplicate rows"?</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>For a primary-key column:
+
+- `duplicated().sum()` counts the **extra repeated rows** after the first occurrence of each value.
+- `nunique()` counts the number of **distinct key values**.
+- Total rows counts every record, including repeated keys.
+
+Example: primary-key values are:
+
+```text
+A, B, C, C, C, D
+```
+
+| Measure | Result | Meaning |
+|---|---:|---|
+| Total rows | 6 | All records |
+| `nunique()` | 4 | Distinct values: A, B, C, D |
+| `duplicated().sum()` | 2 | The second and third occurrences of C are extra rows |
+| Number of duplicated key values | 1 | Only C is duplicated |
+| Frequency of C | 3 | C appears three times |
+
+So if one ID appears three times:
+
+- The number of **duplicated key values** is **1**.
+- The number of **extra duplicate rows** is **2**.
+- The difference is important: one problematic ID can create multiple extra rows.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>When checking foreign keys, what are the differences between using set difference and left join with an indicator? Which method is more suitable for counting isolated numbers, and which is better for locating specific erroneous rows?</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>Both methods answer whether child foreign-key values exist in the parent key column, but they produce different evidence.
+
+| Method | Main output | Best use |
+|---|---|---|
+| Set difference | Distinct child key values absent from the parent | Counting and listing isolated/missing key values |
+| Left join with an indicator | Each child row labelled as matched or unmatched | Locating the exact erroneous child rows and inspecting context |
+
+A set-difference check compares unique values. If the child table has the same invalid foreign key on 20 rows, it reports one missing key value. This is useful for questions such as: “How many distinct customer IDs referenced by orders do not exist in customers?”
+
+A left join retains every child record. The join indicator shows whether each row found a parent match. It can therefore show the 20 affected rows, along with their order IDs, review IDs, product IDs, or other fields needed to investigate the problem.
+
+Use both when possible:
+
+- Use set difference for a compact summary of distinct orphan keys.
+- Use a left join with an indicator for the number of affected child rows and a sample of specific failures.
+
+For the review relationship checks, a left join is especially useful because you need to inspect whether the linked order item belongs to the stated order and product, not merely whether each individual key exists.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>What do the 95% confidence interval of the average value, the standard deviation, and the quartile interval respectively represent? Why can't they all be collectively referred to as "the range of data fluctuations"?</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>They describe different aspects of variation and uncertainty.
+
+| Measure | What it represents |
+|---|---|
+| **95% confidence interval for the mean** | Uncertainty in the estimated population mean. If the sampling process were repeated many times, about 95% of similarly calculated intervals would contain the true population mean. |
+| **Standard deviation** | Typical spread of individual observations around the sample mean. It describes variation among data values. |
+| **Quartile interval** | Usually the interval from the first quartile (Q1) to the third quartile (Q3), containing the middle 50% of observations. Its width is the interquartile range (IQR). It describes the central spread and is relatively robust to outliers. |
+
+They should not all be called “the range of data fluctuations” because they answer different questions:
+
+- A confidence interval concerns uncertainty about an estimated **mean**, not where individual observations lie.
+- Standard deviation concerns average dispersion around the **mean**, and is sensitive to extreme values.
+- The quartile interval concerns the central **50% of observations**, not the mean and not sampling uncertainty.
+
+For example, a dataset can have a narrow 95% confidence interval for its average because it has many records, while still having a large standard deviation and a wide IQR because individual values differ substantially.</pre>
+  </section>
+
+  <section class="message user">
+    <div class="role">User</div>
+    <pre>If there are no orders for a particular month, will the groupby operation definitely generate data for that month? How would the omission of months with zero orders affect the time trend and average values?</pre>
+  </section>
+
+  <section class="message assistant">
+    <div class="role">Assistant</div>
+    <pre>No. A normal `groupby` only returns groups that exist in the data. If no order rows have dates in a month, that month will usually be absent rather than shown with a value of zero.
+
+This can distort analysis:
+
+- **Time trend:** the chart may connect the preceding and following months, visually suggesting continuous activity instead of a zero-order month.
+- **Average monthly orders/revenue:** averaging only months that appear excludes zero months and makes the average too high.
+- **Growth rates:** a missing month can make month-to-month changes misleading or impossible to calculate correctly.
+- **Seasonality:** an omitted zero month can hide a real inactive period and overstate the consistency of demand.
+
+For a complete monthly trend, define the full reporting period first, create every expected month, then align the grouped monthly result to that complete sequence. Fill missing months with zero only for metrics where “no records” truly means zero, such as order count or summed revenue. Do not fill with zero when it means the value is unknown, unavailable, or not applicable.</pre>
+  </section>
+
+</main>
+</body>
+</html>
